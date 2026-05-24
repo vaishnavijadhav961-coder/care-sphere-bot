@@ -31,11 +31,11 @@ function PlaceholderPage({ icon, title, note }) {
 }
 
 // ─── Stub pages (replace with P2's real imports when they deliver) ─────────
-const ProductGrid = () => <PlaceholderPage icon="🛍️" title="Product Grid" note="P2 is building this page — /products" />;
-const ProductPage = () => <PlaceholderPage icon="📦" title="Product Page" note="P2 is building this page — /products/:id" />;
-const Compare     = () => <PlaceholderPage icon="⚖️" title="Compare Products" note="P2 is building this page — /compare?p1=X&p2=Y" />;
-const Track       = () => <PlaceholderPage icon="🚚" title="Order Tracking" note="P2 is building this page — /track/:orderId" />;
-const Coupons     = () => <PlaceholderPage icon="🏷️" title="Coupons" note="P2 is building this page — /coupons" />;
+import ProductGrid from './pages/ProductGrid';
+import ProductPage from './pages/ProductPage';
+import Compare     from './pages/Compare';
+import Track       from './pages/Track';
+import Coupons     from './pages/Coupons';
 
 // ─── 404 ──────────────────────────────────────────────────────────────────
 function NotFound() {
