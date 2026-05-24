@@ -1,0 +1,48 @@
+/* Cosmic Query Branding Design Tokens */
+:root {
+  /* Brand Specific Colors */
+  --primary: #2563EB;
+  --primary-hover: #1D4ED8;
+  --primary-glow: rgba(37, 99, 235, 0.15);
+  
+  --accent: #10B981;
+  --accent-glow: rgba(16, 185, 129, 0.15);
+  
+  --warning: #F59E0B;
+  --warning-glow: rgba(245, 158, 11, 0.15);
+  
+  --error: #EF4444;
+  --error-glow: rgba(239, 68, 68, 0.15);
+  
+  /* Backgrounds & Text (Light Mode by default as per request, but highly stylized SaaS feel) */
+  --bg: #F9FAFB;
+  --card: #FFFFFF;
+  --text: #111827;
+  --subtext: #6B7280;
+  
+  /* Additional Futuristic Assets */
+  --border: #E5E7EB;
+  --border-neon: rgba(37, 99, 235, 0.3);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+  --shadow-neon: 0 0 15px rgba(37, 99, 235, 0.2);
+  
+  /* Animations */
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Elegant Dark Mode Toggle Tokens for Future Expansion (or Pitch Demo!) */
+[data-theme="dark"] {
+  --bg: #0B0F19;
+  --card: #151D30;
+  --text: #F3F4F6;
+  --subtext: #9CA3AF;
+  --border: #1F2937;
+  --border-neon: rgba(37, 99, 235, 0.5);
+  --glass-bg: rgba(21, 29, 48, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --shadow-neon: 0 0 20px rgba(37, 99, 235, 0.4);
+}
