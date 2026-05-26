@@ -218,14 +218,18 @@ body {
 
 /* Seeder Panel Styling */
 .seeder-banner {
-  background: linear-gradient(135deg, #1E293B, #0F172A);
-  color: #F8FAFC;
+  background: #EFF6FF;
+  color: #1E293B;
   padding: 1.5rem;
   border-radius: 1rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
   box-shadow: var(--shadow);
+}
+[data-theme="dark"] .seeder-banner {
+  background: linear-gradient(135deg, #1E293B, #0F172A);
+  color: #F8FAFC;
 }
 
 .seeder-header {
@@ -237,6 +241,9 @@ body {
 .seeder-title {
   font-size: 1.1rem;
   font-weight: 700;
+  color: #2563EB;
+}
+[data-theme="dark"] .seeder-title {
   color: #38BDF8;
 }
 
@@ -247,7 +254,7 @@ body {
 }
 
 .seeder-btn {
-  background: #0284C7;
+  background: var(--primary);
   color: white;
   border: none;
   padding: 0.5rem 1rem;
@@ -259,16 +266,18 @@ body {
 }
 
 .seeder-btn:hover {
-  background: #0369A1;
+  background: var(--primary-hover);
   transform: translateY(-1px);
 }
 
 .seeder-btn.secondary {
-  background: #334155;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
 }
 
 .seeder-btn.secondary:hover {
-  background: #475569;
+  background: var(--border);
 }
 
 /* Order Management Search Bar */

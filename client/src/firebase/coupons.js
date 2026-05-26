@@ -37,6 +37,7 @@ export const createCoupon = async (coupon) => {
     const code = coupon.code.toUpperCase();
     const couponRef = ref(db, `${COUPONS_PATH}/${code}`);
     await set(couponRef, {
+      code,
       discount: coupon.discount || `${coupon.discountPercent}% off`,
       discountPercent: Number(coupon.discountPercent),
       description: coupon.description || '',
@@ -62,6 +63,7 @@ export const seedCoupons = async (coupons) => {
     const seedData = {};
     coupons.forEach((coupon) => {
       seedData[coupon.code.toUpperCase()] = {
+        code: coupon.code.toUpperCase(),
         discount: coupon.discount || `${coupon.discountPercent}% off`,
         discountPercent: Number(coupon.discountPercent),
         description: coupon.description || '',

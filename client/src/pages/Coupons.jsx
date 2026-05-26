@@ -17,7 +17,7 @@ function CouponCard({ coupon }) {
   const isExpired = new Date(coupon.expiryDate) < new Date();
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(coupon.code).then(() => {
+    navigator.clipboard.writeText(coupon.id).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -30,7 +30,7 @@ function CouponCard({ coupon }) {
       </div>
       <div className="coup-card-body">
         <div className="coup-code-row">
-          <span className="coup-code">{coupon.code}</span>
+          <span className="coup-code">{coupon.id}</span>
           {isExpired ? (
             <span className="coup-pill expired">Expired</span>
           ) : (
@@ -106,7 +106,7 @@ export default function Coupons() {
           ) : (
             <div className="coup-grid">
               {sorted.map((coupon) => (
-                <CouponCard key={coupon.code} coupon={coupon} />
+                <CouponCard key={coupon.id} coupon={coupon} />
               ))}
             </div>
           )}

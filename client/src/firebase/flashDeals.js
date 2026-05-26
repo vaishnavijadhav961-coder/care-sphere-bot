@@ -60,6 +60,34 @@ export const checkExistingFlashDeal = async (customerId) => {
 };
 
 /**
+ * Validate a flash deal code for a specific customer.
+ * Checks that the code exists, is not expired, not used, and belongs to the customer.
+ * @param {string} code - The flash deal code (e.g. "QUIZ47")
+ * @param {string} customerId - The customer's UID
+ * @returns {Promise<object|null>} The flash deal details if valid, null otherwise
+ */
+export const validateFlashDealCode = async (code, customerId) => {
+  try {
+    const codesRef = ref(db, PATH);
+    const snapshot = await get(codesRef);
+    if (!snapshot.exists()) return null;
+
+    const now = new Date();
+    let validDeal = null;
+    snapshot.forEach((child) => {
+      const deal = { id: child.key, ...child.val() };
+      if (deal.code === code && !deal.used && deal.customerId === customerId && new Date(deal.expiresAt) > now) {
+        validDeal = deal;
+      }
+    });
+    return validDeal;
+  } catch (error) {
+    console.error('Error validating flash deal code:', error);
+    return null;
+  }
+};
+
+/**
  * Mark a Flash Deal code as used.
  * @param {string} codeId - The RTDB key of the flash deal entry
  */

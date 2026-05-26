@@ -57,11 +57,11 @@ export const addToNotifyList = async (productId, customerId) => {
     if (!list.includes(customerId)) {
       list.push(customerId);
       await set(productRef, list);
-      console.log(`${customerId} added to notifyList for ${productId}`);
     }
+    return true;
   } catch (error) {
     console.error('Error adding to notify list:', error);
-    throw error;
+    return false;
   }
 };
 
@@ -103,7 +103,8 @@ export const createProduct = async (product) => {
       pageUrl: product.pageUrl || id,
       specs: product.specs || {},
       rating: Number(product.rating) || 0,
-      notifyList: product.notifyList || []
+      notifyList: product.notifyList || [],
+      image: product.image || ''
     };
     await set(productRef, payload);
     console.log(`Product ${id} successfully created!`);
@@ -134,7 +135,8 @@ export const seedProducts = async (products) => {
         pageUrl: prod.pageUrl || prod.id,
         specs: prod.specs || {},
         rating: Number(prod.rating) || 0,
-        notifyList: prod.notifyList || []
+        notifyList: prod.notifyList || [],
+        image: prod.image || ''
       };
     });
     await set(productsRef, seedData);

@@ -147,7 +147,13 @@ export default function Compare() {
                   <th className="cmp-th-label"></th>
                   <th className="cmp-th-product">
                     <div className="cmp-prod-header">
-                      <div className="cmp-prod-icon">{p1.category === 'smartphones' ? '📱' : p1.category === 'headphones' ? '🎧' : '📦'}</div>
+                      <div className="cmp-prod-icon">
+                        {p1.image ? (
+                          <img src={p1.image} alt={p1.name} className="cmp-prod-img" />
+                        ) : (
+                          p1.category === 'smartphones' ? '📱' : p1.category === 'headphones' ? '🎧' : '📦'
+                        )}
+                      </div>
                       <div>
                         <div className="cmp-prod-name">{p1.name}</div>
                         <div className="cmp-prod-wins">{wins.p1} win{wins.p1 !== 1 ? 's' : ''}</div>
@@ -156,7 +162,13 @@ export default function Compare() {
                   </th>
                   <th className="cmp-th-product">
                     <div className="cmp-prod-header">
-                      <div className="cmp-prod-icon">{p2.category === 'smartphones' ? '📱' : p2.category === 'headphones' ? '🎧' : '📦'}</div>
+                      <div className="cmp-prod-icon">
+                        {p2.image ? (
+                          <img src={p2.image} alt={p2.name} className="cmp-prod-img" />
+                        ) : (
+                          p2.category === 'smartphones' ? '📱' : p2.category === 'headphones' ? '🎧' : '📦'
+                        )}
+                      </div>
                       <div>
                         <div className="cmp-prod-name">{p2.name}</div>
                         <div className="cmp-prod-wins">{wins.p2} win{wins.p2 !== 1 ? 's' : ''}</div>
@@ -296,6 +308,13 @@ const styles = `
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
+  }
+  .cmp-prod-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 12px;
   }
   .cmp-prod-name {
     font-weight: 700;
