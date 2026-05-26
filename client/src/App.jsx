@@ -1,43 +1,21 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { AuthProvider, useAuth } from './hooks/AuthContext';
+import { ThemeProvider } from './hooks/ThemeContext';
 import ChatWidget from './components/ChatWidget';
 import Admin from './pages/Admin';
+import Login from './pages/Login';
+import Register from './pages/Register';
 import './App.css';
 
-// ─── Placeholder page factory (used until P2 delivers their pages) ─────────
-function PlaceholderPage({ icon, title, note }) {
-  return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#0B0F19',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontFamily: "'Inter', sans-serif",
-      color: '#fff',
-      gap: '1rem',
-      textAlign: 'center',
-      padding: '2rem',
-    }}>
-      <div style={{ fontSize: '3rem' }}>{icon}</div>
-      <h1 style={{ fontSize: '1.5rem', margin: 0, color: '#93c5fd' }}>{title}</h1>
-      <p style={{ color: '#6B7280', margin: 0, fontSize: '0.875rem' }}>{note}</p>
-      <Link to="/admin" style={{ color: '#2563EB', textDecoration: 'none', fontSize: '0.875rem' }}>
-        ← Go to Admin Panel
-      </Link>
-    </div>
-  );
-}
-
-// ─── Stub pages (replace with P2's real imports when they deliver) ─────────
 import ProductGrid from './pages/ProductGrid';
 import ProductPage from './pages/ProductPage';
 import Compare     from './pages/Compare';
 import Track       from './pages/Track';
 import Coupons     from './pages/Coupons';
+import Checkout    from './pages/Checkout';
+import Orders      from './pages/Orders';
 
-// ─── 404 ──────────────────────────────────────────────────────────────────
 function NotFound() {
   return (
     <div style={{
@@ -57,28 +35,52 @@ function NotFound() {
   );
 }
 
-// ─── App ───────────────────────────────────────────────────────────────────
+function ProtectedAdmin({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', fontFamily: 'Sora, sans-serif' }}>Loading...</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!user.isAdmin) return <Navigate to="/products" replace />;
+  return children;
+}
+
+function AlreadyAuth({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (user) return <Navigate to="/products" replace />;
+  return children;
+}
+
+function ProtectedUser({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', fontFamily: 'Sora, sans-serif' }}>Loading...</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  return children;
+}
+
 function App() {
   return (
-    <Router>
-      {/*
-        ChatWidget is mounted OUTSIDE <Routes> so it persists across all pages.
-        P2 can remove this line if they want per-page control, but the
-        recommended approach is to keep it here for the demo.
-      */}
-      <ChatWidget initialProductContext={null} />
+    <ThemeProvider>
+      <AuthProvider>
+        <Router>
+          <ChatWidget initialProductContext={null} />
 
-      <Routes>
-        <Route path="/"                 element={<Navigate to="/products" replace />} />
-        <Route path="/products"         element={<ProductGrid />} />
-        <Route path="/products/:id"     element={<ProductPage />} />
-        <Route path="/compare"          element={<Compare />} />
-        <Route path="/track/:orderId"   element={<Track />} />
-        <Route path="/coupons"          element={<Coupons />} />
-        <Route path="/admin"            element={<Admin />} />
-        <Route path="*"                 element={<NotFound />} />
-      </Routes>
-    </Router>
+          <Routes>
+            <Route path="/"                 element={<Navigate to="/products" replace />} />
+            <Route path="/products"         element={<ProductGrid />} />
+            <Route path="/products/:id"     element={<ProductPage />} />
+            <Route path="/compare"          element={<Compare />} />
+            <Route path="/track/:orderId"   element={<Track />} />
+            <Route path="/coupons"          element={<Coupons />} />
+            <Route path="/login"            element={<AlreadyAuth><Login /></AlreadyAuth>} />
+            <Route path="/register"         element={<AlreadyAuth><Register /></AlreadyAuth>} />
+            <Route path="/checkout"         element={<Checkout />} />
+            <Route path="/orders"           element={<ProtectedUser><Orders /></ProtectedUser>} />
+            <Route path="/admin"            element={<ProtectedAdmin><Admin /></ProtectedAdmin>} />
+            <Route path="*"                 element={<NotFound />} />
+          </Routes>
+        </Router>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

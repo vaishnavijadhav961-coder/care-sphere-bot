@@ -1,184 +1,182 @@
-.counter {
-  font-size: 16px;
-  padding: 5px 10px;
-  border-radius: 5px;
-  color: var(--accent);
-  background: var(--accent-bg);
-  border: 2px solid transparent;
-  transition: border-color 0.3s;
-  margin-bottom: 24px;
+/* ── Dark Mode Overrides ──────────────────────────────────────────────── */
+/* Applied globally when data-theme="dark" is set via ThemeContext */
 
-  &:hover {
-    border-color: var(--accent-border);
-  }
-  &:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
+[data-theme="dark"] .tn-nav {
+  background: #1F2937;
+  border-bottom-color: #374151;
 }
+[data-theme="dark"] .tn-logo { color: #60A5FA; }
+[data-theme="dark"] .tn-btn-ghost { color: #D1D5DB; }
+[data-theme="dark"] .tn-btn-ghost:hover { background: #374151; }
+[data-theme="dark"] .tn-user-trigger { color: #D1D5DB; }
+[data-theme="dark"] .tn-user-trigger:hover { background: #374151; }
+[data-theme="dark"] .tn-dropdown { background: #1F2937; border-color: #374151; }
+[data-theme="dark"] .tn-dropdown-name { color: #F9FAFB; }
+[data-theme="dark"] .tn-dropdown-email { color: #9CA3AF; }
+[data-theme="dark"] .tn-dropdown-item { color: #D1D5DB; }
+[data-theme="dark"] .tn-dropdown-item:hover { background: #374151; }
+[data-theme="dark"] .tn-dropdown-header { border-bottom-color: #374151; }
+[data-theme="dark"] .tn-dropdown-divider { background: #374151; }
 
-.hero {
-  position: relative;
+[data-theme="dark"] .p2-page { background: #111827; }
+[data-theme="dark"] .p2-search { background: #1F2937; border-color: #374151; color: #F9FAFB; }
+[data-theme="dark"] .p2-search:focus { border-color: #60A5FA; background: #1F2937; }
+[data-theme="dark"] .p2-sort-select { background: #1F2937; border-color: #374151; color: #D1D5DB; }
+[data-theme="dark"] .p2-cat-bar { background: #1F2937; border-bottom-color: #374151; }
+[data-theme="dark"] .p2-cat-pill { background: #1F2937; border-color: #374151; color: #9CA3AF; }
+[data-theme="dark"] .p2-cat-pill:hover { border-color: #60A5FA; color: #60A5FA; }
+[data-theme="dark"] .p2-cat-pill.active { background: #2563EB; border-color: #2563EB; color: #fff; }
+[data-theme="dark"] .p2-product-card { background: #1F2937; border-color: #374151; }
+[data-theme="dark"] .p2-product-card:hover { border-color: #2563EB; }
+[data-theme="dark"] .p2-card-img-wrap { background: linear-gradient(135deg, #1E3A5F, #1A3A2A); }
+[data-theme="dark"] .p2-card-name { color: #F9FAFB; }
+[data-theme="dark"] .p2-card-category { color: #6B7280; }
+[data-theme="dark"] .p2-price-main { color: #F9FAFB; }
+[data-theme="dark"] .p2-ask-btn { background: #1E3A5F; border-color: #2563EB; color: #60A5FA; }
+[data-theme="dark"] .p2-ask-btn:hover { background: #2563EB; color: #fff; }
+[data-theme="dark"] .p2-results-count { color: #9CA3AF; }
 
-  .base,
-  .framework,
-  .vite {
-    inset-inline: 0;
-    margin: 0 auto;
-  }
+[data-theme="dark"] .pp-page { background: #111827; }
+[data-theme="dark"] .pp-breadcrumb { background: #1F2937; border-bottom-color: #374151; }
+[data-theme="dark"] .pp-bc-current { color: #9CA3AF; }
+[data-theme="dark"] .pp-name { color: #F9FAFB; }
+[data-theme="dark"] .pp-price-block { background: #1F2937; border-color: #374151; }
+[data-theme="dark"] .pp-price-main { color: #F9FAFB; }
+[data-theme="dark"] .pp-price-original { color: #6B7280; }
+[data-theme="dark"] .pp-description { color: #D1D5DB; }
+[data-theme="dark"] .pp-specs-table { background: #1F2937; border-color: #374151; }
+[data-theme="dark"] .pp-specs-table tr { border-bottom-color: #374151; }
+[data-theme="dark"] .pp-spec-key { background: #374151; color: #9CA3AF; }
+[data-theme="dark"] .pp-spec-val { color: #D1D5DB; }
+[data-theme="dark"] .pp-ask-btn { background: #1E3A5F; border-color: #2563EB; color: #60A5FA; }
+[data-theme="dark"] .pp-ask-btn:hover { background: #2563EB; color: #fff; }
+[data-theme="dark"] .pp-img-box { background: linear-gradient(135deg, #1E3A5F, #1A3A2A); }
+[data-theme="dark"] .pp-category-tag { color: #6B7280; }
+[data-theme="dark"] .pp-qty-label { color: #D1D5DB; }
+[data-theme="dark"] .pp-qty-btn { background: #374151; border-color: #4B5563; color: #D1D5DB; }
+[data-theme="dark"] .pp-qty-btn:hover { background: #4B5563; }
+[data-theme="dark"] .pp-qty-value { color: #F9FAFB; }
+[data-theme="dark"] .pp-qty-max { color: #6B7280; }
 
-  .base {
-    width: 170px;
-    position: relative;
-    z-index: 0;
-  }
+[data-theme="dark"] .trk-page { background: #111827; }
+[data-theme="dark"] .trk-breadcrumb { background: #1F2937; border-bottom-color: #374151; }
+[data-theme="dark"] .trk-bc-current { color: #9CA3AF; }
+[data-theme="dark"] .trk-summary-card { background: #1F2937; border-color: #374151; }
+[data-theme="dark"] .trk-order-id { color: #F9FAFB; }
+[data-theme="dark"] .trk-meta-val { color: #D1D5DB; }
+[data-theme="dark"] .trk-timeline-card { background: #1F2937; border-color: #374151; }
+[data-theme="dark"] .trk-step-label { color: #6B7280; }
+[data-theme="dark"] .trk-step-label.done { color: #10B981; }
+[data-theme="dark"] .trk-return-btn { background: #1F2937; border-color: #374151; color: #D1D5DB; }
+[data-theme="dark"] .trk-return-btn:hover { background: #374151; }
 
-  .framework,
-  .vite {
-    position: absolute;
-  }
+[data-theme="dark"] .co-page { background: #111827; }
+[data-theme="dark"] .co-title { color: #F9FAFB; }
+[data-theme="dark"] .co-item { background: #1F2937; border-color: #374151; }
+[data-theme="dark"] .co-item-name { color: #F9FAFB; }
+[data-theme="dark"] .co-item-price { color: #F9FAFB; }
+[data-theme="dark"] .co-qty-btn { background: #374151; border-color: #4B5563; color: #D1D5DB; }
+[data-theme="dark"] .co-qty-btn:hover:not(:disabled) { background: #4B5563; }
+[data-theme="dark"] .co-qty-btn:disabled { opacity: 0.3; }
+[data-theme="dark"] .co-qty-value { color: #F9FAFB; }
+[data-theme="dark"] .co-total-row { background: #1F2937; border-color: #374151; }
+[data-theme="dark"] .co-total-amount { color: #F9FAFB; }
+[data-theme="dark"] .co-total-label { color: #D1D5DB; }
+[data-theme="dark"] .co-payment-section { background: #1F2937; border-color: #374151; }
+[data-theme="dark"] .co-coupon-section { background: #1F2937; border-color: #374151; }
+.co-coupon-input::placeholder { color: #9CA3AF; }
+[data-theme="dark"] .co-coupon-input { background: #1F2937; border-color: #374151; color: #F9FAFB; }
+[data-theme="dark"] .co-coupon-input::placeholder { color: #6B7280; }
+[data-theme="dark"] .co-coupon-input:focus { border-color: #60A5FA; }
+[data-theme="dark"] .co-btn-secondary { background: #1F2937; color: #D1D5DB; border-color: #374151; }
+[data-theme="dark"] .co-btn-secondary:hover { border-color: #6B7280; }
 
-  .framework {
-    z-index: 1;
-    top: 34px;
-    height: 28px;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg)
-      scale(1.4);
-  }
+[data-theme="dark"] .ord-page { background: #111827; }
+[data-theme="dark"] .ord-title { color: #F9FAFB; }
+[data-theme="dark"] .ord-card { background: #1F2937; border-color: #374151; }
+[data-theme="dark"] .ord-card:hover { border-color: #2563EB; }
+[data-theme="dark"] .ord-card-id { color: #D1D5DB; }
+[data-theme="dark"] .ord-card-product { color: #F9FAFB; }
+[data-theme="dark"] .ord-card-price { color: #F9FAFB; }
+[data-theme="dark"] .ord-card-date { color: #9CA3AF; }
+[data-theme="dark"] .ord-card-qty { color: #6B7280; }
 
-  .vite {
-    z-index: 0;
-    top: 107px;
-    height: 26px;
-    width: auto;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg)
-      scale(0.8);
-  }
-}
+[data-theme="dark"] .ac-page { background: #111827; }
+[data-theme="dark"] .ac-header { background: #1F2937; border-color: #374151; }
+[data-theme="dark"] .ac-greeting { color: #F9FAFB; }
+[data-theme="dark"] .ac-section-title { color: #F9FAFB; }
+[data-theme="dark"] .ac-order-card { background: #1F2937; border-color: #374151; }
+[data-theme="dark"] .ac-order-card:hover { border-color: #2563EB; }
+[data-theme="dark"] .ac-order-id { color: #D1D5DB; }
+[data-theme="dark"] .ac-order-product { color: #F9FAFB; }
+[data-theme="dark"] .ac-order-price { color: #F9FAFB; }
+[data-theme="dark"] .ac-order-date { color: #9CA3AF; }
 
-#center {
-  display: flex;
-  flex-direction: column;
-  gap: 25px;
-  place-content: center;
-  place-items: center;
-  flex-grow: 1;
+[data-theme="dark"] .p2-loading { color: #9CA3AF; }
+[data-theme="dark"] .co-loading { color: #9CA3AF; }
+[data-theme="dark"] .trk-loading { color: #9CA3AF; }
+[data-theme="dark"] .ord-loading { color: #9CA3AF; }
+[data-theme="dark"] .pp-loading { color: #9CA3AF; }
+[data-theme="dark"] .co-empty p { color: #9CA3AF; }
+[data-theme="dark"] .ord-empty p { color: #9CA3AF; }
+[data-theme="dark"] .trk-not-found p { color: #9CA3AF; }
 
-  @media (max-width: 1024px) {
-    padding: 32px 20px 24px;
-    gap: 18px;
-  }
-}
+body .auth-field input { background: #fff; color: #111827; }
+body .auth-field input::placeholder { color: #9CA3AF; }
+body .auth-page { background: linear-gradient(135deg, #F9FAFB 0%, #E5E7EB 100%); }
+[data-theme="dark"] .auth-page { background: #0B0F19; }
+[data-theme="dark"] .auth-card { background: #1F2937; }
+[data-theme="dark"] .auth-card h1 { color: #F9FAFB; }
+[data-theme="dark"] .auth-card p { color: #9CA3AF; }
+[data-theme="dark"] .auth-field label { color: #D1D5DB; }
+[data-theme="dark"] .auth-field input { background: #111827; border-color: #374151; color: #F9FAFB; }
+[data-theme="dark"] .auth-field input::placeholder { color: #6B7280; }
+[data-theme="dark"] .auth-field input:focus { border-color: #60A5FA; }
+[data-theme="dark"] .auth-btn { background: #2563EB; }
+[data-theme="dark"] .auth-btn:hover { background: #1D4ED8; }
+[data-theme="dark"] .auth-error { background: rgba(239,68,68,0.15); color: #FCA5A5; }
+[data-theme="dark"] .auth-footer { color: #9CA3AF; }
+[data-theme="dark"] .auth-footer a { color: #60A5FA; }
 
-#next-steps {
-  display: flex;
-  border-top: 1px solid var(--border);
-  text-align: left;
+/* Compare */
+[data-theme="dark"] .cmp-page { background: #111827; }
+[data-theme="dark"] .cmp-title { color: #F9FAFB; }
+[data-theme="dark"] .cmp-subtitle { color: #9CA3AF; }
+[data-theme="dark"] .cmp-breadcrumb { background: #1F2937; border-bottom-color: #374151; }
+[data-theme="dark"] .cmp-bc-current { color: #9CA3AF; }
+[data-theme="dark"] .cmp-winner-banner { background: linear-gradient(135deg, #064E3B, #065F46); border-color: #10B981; color: #6EE7B7; }
+[data-theme="dark"] .cmp-table-wrap { background: #1F2937; border-color: #374151; }
+[data-theme="dark"] .cmp-table thead tr { background: #111827; border-bottom-color: #374151; }
+[data-theme="dark"] .cmp-prod-name { color: #F9FAFB; }
+[data-theme="dark"] .cmp-row-label { background: #111827; color: #9CA3AF; }
+[data-theme="dark"] .cmp-cell { color: #D1D5DB; }
+[data-theme="dark"] .cmp-cell.winner { background: #064E3B; color: #6EE7B7; }
+[data-theme="dark"] .cmp-section-row td { background: #111827; color: #6B7280; border-top-color: #374151; }
+[data-theme="dark"] .cmp-prod-icon { background: #1E3A5F; }
+[data-theme="dark"] .cmp-table tbody tr:hover { background: #1A1F2E; }
+[data-theme="dark"] .cmp-table tbody tr { border-bottom-color: #2D3748; }
+[data-theme="dark"] .cmp-error-box h2 { color: #F9FAFB; }
+[data-theme="dark"] .cmp-error-box p { color: #9CA3AF; }
+[data-theme="dark"] .cmp-loading { color: #9CA3AF; }
 
-  & > div {
-    flex: 1 1 0;
-    padding: 32px;
-    @media (max-width: 1024px) {
-      padding: 24px 20px;
-    }
-  }
-
-  .icon {
-    margin-bottom: 16px;
-    width: 22px;
-    height: 22px;
-  }
-
-  @media (max-width: 1024px) {
-    flex-direction: column;
-    text-align: center;
-  }
-}
-
-#docs {
-  border-right: 1px solid var(--border);
-
-  @media (max-width: 1024px) {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-}
-
-#next-steps ul {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  gap: 8px;
-  margin: 32px 0 0;
-
-  .logo {
-    height: 18px;
-  }
-
-  a {
-    color: var(--text-h);
-    font-size: 16px;
-    border-radius: 6px;
-    background: var(--social-bg);
-    display: flex;
-    padding: 6px 12px;
-    align-items: center;
-    gap: 8px;
-    text-decoration: none;
-    transition: box-shadow 0.3s;
-
-    &:hover {
-      box-shadow: var(--shadow);
-    }
-    .button-icon {
-      height: 18px;
-      width: 18px;
-    }
-  }
-
-  @media (max-width: 1024px) {
-    margin-top: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
-
-    li {
-      flex: 1 1 calc(50% - 8px);
-    }
-
-    a {
-      width: 100%;
-      justify-content: center;
-      box-sizing: border-box;
-    }
-  }
-}
-
-#spacer {
-  height: 88px;
-  border-top: 1px solid var(--border);
-  @media (max-width: 1024px) {
-    height: 48px;
-  }
-}
-
-.ticks {
-  position: relative;
-  width: 100%;
-
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    top: -4.5px;
-    border: 5px solid transparent;
-  }
-
-  &::before {
-    left: 0;
-    border-left-color: var(--border);
-  }
-  &::after {
-    right: 0;
-    border-right-color: var(--border);
-  }
-}
+/* Coupons */
+[data-theme="dark"] .coup-page { background: #111827; color: #F9FAFB; }
+[data-theme="dark"] .coup-header { background: #1F2937; border-bottom-color: #374151; }
+[data-theme="dark"] .coup-header-title { color: #F9FAFB; }
+[data-theme="dark"] .coup-header-count { background: #064E3B; color: #6EE7B7; }
+[data-theme="dark"] .coup-filter-bar { background: #1F2937; border-bottom-color: #2D3748; }
+[data-theme="dark"] .coup-filter-pill { background: #1F2937; border-color: #374151; color: #9CA3AF; }
+[data-theme="dark"] .coup-filter-pill:hover { border-color: #60A5FA; color: #60A5FA; }
+[data-theme="dark"] .coup-filter-pill.active { background: #2563EB; border-color: #2563EB; color: #fff; }
+[data-theme="dark"] .coup-card { background: #1F2937; border-color: #374151; }
+[data-theme="dark"] .coup-card:hover { box-shadow: 0 4px 20px rgba(37,99,235,0.2); }
+[data-theme="dark"] .coup-card-left { background: linear-gradient(135deg, #1E3A5F, #1E40AF); }
+[data-theme="dark"] .coup-code { background: #1E3A5F; color: #93C5FD; }
+[data-theme="dark"] .coup-discount { color: #6EE7B7; }
+[data-theme="dark"] .coup-desc { color: #9CA3AF; }
+[data-theme="dark"] .coup-expiry { color: #6B7280; }
+[data-theme="dark"] .coup-copy-btn { background: #1E3A5F; border-color: #2563EB; color: #60A5FA; }
+[data-theme="dark"] .coup-copy-btn:hover:not(:disabled) { background: #2563EB; color: #fff; border-color: #2563EB; }
+[data-theme="dark"] .coup-copy-btn.copied { background: #064E3B; border-color: #10B981; color: #6EE7B7; }
+[data-theme="dark"] .coup-info-note { background: #451A03; border-color: #92400E; color: #FBBF24; }
+[data-theme="dark"] .coup-loading { color: #9CA3AF; }

@@ -1,13 +1,19 @@
 import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useRealtimeListener } from '../hooks/useRealtimeListener';
 import { updateOrderStatus, seedOrders } from '../firebase/orders';
 import { resolveEscalation, createEscalation, seedEscalations, addMessageToEscalation } from '../firebase/escalations';
 import { updateProductStock, createProduct, seedProducts } from '../firebase/products';
 import { createCoupon, seedCoupons, seedFlashDeals } from '../firebase/coupons';
+import { useAuth } from '../hooks/AuthContext';
+import { useTheme } from '../hooks/ThemeContext';
 import '../styles/admin.css';
 
 // Futuristic SaaS Dashboard for COSMIC QUERY (CareSphere AI)
 export default function Admin() {
+  const { logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
   // Navigation State
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -24,7 +30,6 @@ export default function Admin() {
   const [productCategoryFilter, setProductCategoryFilter] = useState('All');
   const [expandedEscalations, setExpandedEscalations] = useState({});
   const [agentReplies, setAgentReplies] = useState({});
-  const [theme, setTheme] = useState('dark'); 
   
   // Delay Modal States
   const [isDelayModalOpen, setIsDelayModalOpen] = useState(false);
@@ -45,6 +50,7 @@ export default function Admin() {
     code: '',
     discountPercent: '',
     expiryDate: '',
+    applicableOn: '',
     isActive: true
   });
 
@@ -56,18 +62,6 @@ export default function Admin() {
   const activeOrdersCount = orders.filter(o => o.status !== 'Delivered').length;
   const unresolvedEscCount = escalations.filter(e => e.status !== 'resolved').length;
   const lowStockCount = products.filter(p => p.stock <= 5).length;
-
-  // Apply Theme Toggle
-  const toggleTheme = () => {
-    const nextTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(nextTheme);
-    document.documentElement.setAttribute('data-theme', nextTheme);
-  };
-
-  // Set initial theme on mount
-  React.useEffect(() => {
-    document.documentElement.setAttribute('data-theme', 'dark');
-  }, []);
 
   // Handle Order Status Change Dropdown
   const handleStatusChange = async (orderId, newStatus) => {
@@ -198,6 +192,7 @@ export default function Admin() {
         code: '',
         discountPercent: '',
         expiryDate: '',
+        applicableOn: '',
         isActive: true
       });
       alert('Coupon code successfully created!');
@@ -212,16 +207,16 @@ export default function Admin() {
     try {
       // 1. Mock Products — matching AGENTS.md schema
       const mockProducts = [
-        { id: 'prod_iphone15', name: 'iPhone 15', price: 79900, stock: 15, discount: 10, rating: 4.5, category: 'smartphones', pageUrl: 'iphone15', inStock: true, description: 'Latest iPhone with A16 Bionic chip and 48MP camera', specs: { processor: 'A16 Bionic', display: '6.1 inch OLED', battery: '20 hours', camera: '48MP' }, notifyList: [] },
-        { id: 'prod_samsungs24', name: 'Samsung Galaxy S24', price: 69900, stock: 12, discount: 15, rating: 4.4, category: 'smartphones', pageUrl: 'samsung-s24', inStock: true, description: 'Premium Android with AI features and stunning display', specs: { processor: 'Exynos 2400', display: '6.2 inch AMOLED', battery: '22 hours', camera: '50MP' }, notifyList: [] },
-        { id: 'prod_nikeairmax', name: 'Nike Air Max', price: 8999, stock: 20, discount: 25, rating: 4.3, category: 'footwear', pageUrl: 'nike-air-max', inStock: true, description: 'Comfortable running shoes with Air cushioning technology', specs: { sole: 'Rubber', closure: 'Lace-up', weight: '280g' }, notifyList: [] },
-        { id: 'prod_adidasultra', name: 'Adidas Ultraboost', price: 11999, stock: 8, discount: 20, rating: 4.6, category: 'footwear', pageUrl: 'adidas-ultraboost', inStock: true, description: 'Ultra-comfortable running shoes with Boost technology', specs: { sole: 'Continental Rubber', closure: 'Lace-up', weight: '260g' }, notifyList: [] },
-        { id: 'prod_serum', name: 'Vitamin C Serum', price: 1299, stock: 30, discount: 5, rating: 4.2, category: 'skincare', pageUrl: 'vitamin-c-serum', inStock: true, description: 'Brightening serum with 20% Vitamin C and Hyaluronic Acid', specs: { volume: '30ml', ingredients: 'Vitamin C, HA, Vitamin E', skinType: 'All' }, notifyList: [] },
-        { id: 'prod_moisturizer', name: 'Hydra Glow Moisturizer', price: 899, stock: 0, discount: 0, rating: 4.0, category: 'skincare', pageUrl: 'hydra-glow', inStock: false, description: 'Lightweight daily moisturizer with SPF 30', specs: { volume: '50ml', spf: '30', skinType: 'All' }, notifyList: ['user123'] },
-        { id: 'prod_samsonite', name: 'Samsonite Lite luggage', price: 5499, stock: 7, discount: 30, rating: 4.7, category: 'luggage', pageUrl: 'samsonite-lite', inStock: true, description: 'Ultra-lightweight hard shell luggage with 4 spinner wheels', specs: { capacity: '60L', weight: '2.5kg', material: 'Polycarbonate' }, notifyList: [] },
-        { id: 'prod_sonyxm5', name: 'Sony WH-1000XM5', price: 24990, stock: 5, discount: 12, rating: 4.8, category: 'headphones', pageUrl: 'sony-xm5', inStock: true, description: 'Industry-leading noise cancelling headphones', specs: { driver: '30mm', battery: '30 hours', noiseCancelling: 'Adaptive' }, notifyList: ['user456'] },
-        { id: 'prod_airpods', name: 'AirPods Pro 2', price: 19900, stock: 10, discount: 8, rating: 4.6, category: 'headphones', pageUrl: 'airpods-pro-2', inStock: true, description: 'Premium wireless earbuds with active noise cancellation', specs: { chip: 'H2', battery: '6 hours', charging: 'USB-C/MagSafe' }, notifyList: [] },
-        { id: 'prod_macbook', name: 'MacBook Air M3', price: 99900, stock: 6, discount: 5, rating: 4.9, category: 'electronics', pageUrl: 'macbook-air-m3', inStock: true, description: 'Ultra-thin laptop with Apple M3 chip and 18-hour battery', specs: { processor: 'Apple M3', ram: '16GB', storage: '256GB', display: '15.3 inch' }, notifyList: [] }
+        { id: 'prod_iphone15', name: 'iPhone 15', price: 79900, stock: 15, discount: 10, rating: 4.5, category: 'smartphones', pageUrl: 'iphone15', inStock: true, description: 'Latest iPhone with A16 Bionic chip and 48MP camera', image: '/images/iPhone-15.jpg', specs: { processor: 'A16 Bionic', display: '6.1 inch OLED', battery: '20 hours', camera: '48MP' }, notifyList: [] },
+        { id: 'prod_samsungs24', name: 'Samsung Galaxy S24', price: 69900, stock: 12, discount: 15, rating: 4.4, category: 'smartphones', pageUrl: 'samsung-s24', inStock: true, description: 'Premium Android with AI features and stunning display', image: '/images/Samsung-Galaxy-S24.webp', specs: { processor: 'Exynos 2400', display: '6.2 inch AMOLED', battery: '22 hours', camera: '50MP' }, notifyList: [] },
+        { id: 'prod_nikeairmax', name: 'Nike Air Max', price: 8999, stock: 20, discount: 25, rating: 4.3, category: 'footwear', pageUrl: 'nike-air-max', inStock: true, description: 'Comfortable running shoes with Air cushioning technology', image: '/images/Nike-Air-Max.webp', specs: { sole: 'Rubber', closure: 'Lace-up', weight: '280g' }, notifyList: [] },
+        { id: 'prod_adidasultra', name: 'Adidas Ultraboost', price: 11999, stock: 8, discount: 20, rating: 4.6, category: 'footwear', pageUrl: 'adidas-ultraboost', inStock: true, description: 'Ultra-comfortable running shoes with Boost technology', image: '/images/Adidas-Ultraboost.webp', specs: { sole: 'Continental Rubber', closure: 'Lace-up', weight: '260g' }, notifyList: [] },
+        { id: 'prod_serum', name: 'Minimalist Vitamin C Serum', price: 1299, stock: 30, discount: 5, rating: 4.2, category: 'skincare', pageUrl: 'vitamin-c-serum', inStock: true, description: 'Brightening serum with 20% Vitamin C and Hyaluronic Acid', image: '/images/Minimalist-Vitamin-C-Serum.jpg', specs: { volume: '30ml', ingredients: 'Vitamin C, HA, Vitamin E', skinType: 'All' }, notifyList: [] },
+        { id: 'prod_moisturizer', name: 'Vaseline Sun Protect SPF 30 Body Lotion', price: 899, stock: 0, discount: 0, rating: 4.0, category: 'skincare', pageUrl: 'hydra-glow', inStock: false, description: 'Lightweight daily moisturizer with SPF 30', image: '/images/Vaseline-Sun-Protect-SPF-30-Body-Lotion.jpg', specs: { volume: '50ml', spf: '30', skinType: 'All' }, notifyList: ['user123'] },
+        { id: 'prod_samsonite', name: 'Samsonite Lite luggage', price: 5499, stock: 7, discount: 30, rating: 4.7, category: 'luggage', pageUrl: 'samsonite-lite', inStock: true, description: 'Ultra-lightweight hard shell luggage with 4 spinner wheels', image: '/images/Samsonite-Lite-luggage.webp', specs: { capacity: '60L', weight: '2.5kg', material: 'Polycarbonate' }, notifyList: [] },
+        { id: 'prod_sonyxm5', name: 'Sony WH-1000XM5', price: 24990, stock: 5, discount: 12, rating: 4.8, category: 'headphones', pageUrl: 'sony-xm5', inStock: true, description: 'Industry-leading noise cancelling headphones', image: '/images/Sony-WH-1000XM5.jpg', specs: { driver: '30mm', battery: '30 hours', noiseCancelling: 'Adaptive' }, notifyList: ['user456'] },
+        { id: 'prod_airpods', name: 'AirPods 4', price: 19900, stock: 10, discount: 8, rating: 4.6, category: 'headphones', pageUrl: 'airpods-pro-2', inStock: true, description: 'Premium wireless earbuds with active noise cancellation', image: '/images/AirPods-Pro-4.jpg', specs: { chip: 'H2', battery: '6 hours', charging: 'USB-C/MagSafe' }, notifyList: [] },
+        { id: 'prod_macbook', name: 'MacBook Air M3', price: 99900, stock: 6, discount: 5, rating: 4.9, category: 'electronics', pageUrl: 'macbook-air-m3', inStock: true, description: 'Ultra-thin laptop with Apple M3 chip and 18-hour battery', image: '/images/MacBook-Air-M3.jpg', specs: { processor: 'Apple M3', ram: '16GB', storage: '256GB', display: '15.3 inch' }, notifyList: [] }
       ];
       await seedProducts(mockProducts);
 
@@ -233,17 +228,18 @@ export default function Admin() {
       const tomorrow = new Date(now + 1 * 24 * 60 * 60 * 1000);
       const nextWeek = new Date(now + 7 * 24 * 60 * 60 * 1000);
 
+      const randStr = (n) => Math.random().toString(36).substring(2, 2 + n);
       const mockOrders = [
-        { id: 'ord_1023', customerId: 'user123', productId: 'prod_nikeairmax', productName: 'Nike Air Max', price: 8999, status: 'Delayed', orderDate: fiveDaysAgo.toISOString(), shippedDate: formatDate(threeDaysAgo), estimatedDelivery: threeDaysAgo.toISOString(), newDate: formatDate(nextWeek), delayReason: 'Weather disruption in transit hub', trackingNumber: 'TRK-NIKE-1023', timeline: [
+        { id: `ord_${fiveDaysAgo.getTime()}_${randStr(4)}`, customerId: 'user123', productId: 'prod_nikeairmax', productName: 'Nike Air Max', price: 8999, status: 'Delayed', orderDate: fiveDaysAgo.toISOString(), shippedDate: formatDate(threeDaysAgo), estimatedDelivery: threeDaysAgo.toISOString(), newDate: formatDate(nextWeek), delayReason: 'Weather disruption in transit hub', trackingNumber: 'TRK-NIKE-AIR', timeline: [
           { status: 'Confirmed', date: formatDate(fiveDaysAgo), completed: true },
           { status: 'Shipped', date: formatDate(threeDaysAgo), completed: true },
           { status: 'Delayed', date: formatDate(now), completed: false }
         ]},
-        { id: 'ord_1024', customerId: 'user123', productId: 'prod_iphone15', productName: 'iPhone 15', price: 79900, status: 'Shipped', orderDate: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(), shippedDate: formatDate(new Date(now - 1 * 24 * 60 * 60 * 1000)), estimatedDelivery: tomorrow.toISOString(), newDate: '', delayReason: '', trackingNumber: 'TRK-IPHN-1024', timeline: [
+        { id: `ord_${new Date(now - 2 * 24 * 60 * 60 * 1000).getTime()}_${randStr(4)}`, customerId: 'user123', productId: 'prod_iphone15', productName: 'iPhone 15', price: 79900, status: 'Shipped', orderDate: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(), shippedDate: formatDate(new Date(now - 1 * 24 * 60 * 60 * 1000)), estimatedDelivery: tomorrow.toISOString(), newDate: '', delayReason: '', trackingNumber: 'TRK-IPHN-15', timeline: [
           { status: 'Confirmed', date: formatDate(new Date(now - 2 * 24 * 60 * 60 * 1000)), completed: true },
           { status: 'Shipped', date: formatDate(new Date(now - 1 * 24 * 60 * 60 * 1000)), completed: true }
         ]},
-        { id: 'ord_1025', customerId: 'user123', productId: 'prod_sonyxm5', productName: 'Sony WH-1000XM5', price: 24990, status: 'Confirmed', orderDate: now.toISOString(), shippedDate: '', estimatedDelivery: nextWeek.toISOString(), newDate: '', delayReason: '', trackingNumber: '', timeline: [
+        { id: `ord_${now.getTime()}_${randStr(4)}`, customerId: 'user123', productId: 'prod_sonyxm5', productName: 'Sony WH-1000XM5', price: 24990, status: 'Confirmed', orderDate: now.toISOString(), shippedDate: '', estimatedDelivery: nextWeek.toISOString(), newDate: '', delayReason: '', trackingNumber: '', timeline: [
           { status: 'Confirmed', date: formatDate(now), completed: true }
         ]}
       ];
@@ -396,8 +392,14 @@ export default function Admin() {
           </div>
         </div>
         <div className="header-controls">
+          <button className="theme-toggle-btn" onClick={() => navigate('/products')}>
+            ← Store
+          </button>
           <button className="theme-toggle-btn" onClick={toggleTheme}>
             {theme === 'dark' ? '☀️ Light Deck' : '🌙 Dark Deck'}
+          </button>
+          <button className="theme-toggle-btn" onClick={logout} style={{ color: '#EF4444' }}>
+            Sign Out
           </button>
         </div>
       </header>
@@ -963,8 +965,8 @@ export default function Admin() {
                         const isExpired = new Date(coup.expiryDate) < new Date();
                         const isStatusActive = coup.isActive && !isExpired;
                         return (
-                          <div className="coupon-card" key={coup.code}>
-                            <span className="coupon-code-label">{coup.code}</span>
+                          <div className="coupon-card" key={coup.id}>
+                            <span className="coupon-code-label">{coup.code || coup.id}</span>
                             <span className="coupon-discount">{coup.discountPercent}% OFF</span>
                             <span className="coupon-expiry">Expires: {new Date(coup.expiryDate).toLocaleDateString()}</span>
                             <span className={`coupon-status-pill ${isStatusActive ? 'active' : 'expired'}`}>
@@ -988,14 +990,15 @@ export default function Admin() {
                     <div className="coupons-grid">
                       {flashDeals.map(deal => {
                         const isExpired = new Date(deal.expiresAt) < new Date();
-                        const isStatusActive = deal.isActive && !isExpired;
+                        const isUsed = deal.used === true;
+                        const isStatusActive = !isUsed && (deal.isActive || true) && !isExpired;
                         return (
-                          <div className="coupon-card" key={deal.code} style={{ borderLeft: '3px solid var(--error)' }}>
-                            <span className="coupon-code-label" style={{ borderColor: 'var(--error-glow)' }}>{deal.code}</span>
+                          <div className="coupon-card" key={deal.id} style={{ borderLeft: '3px solid var(--error)' }}>
+                            <span className="coupon-code-label" style={{ borderColor: 'var(--error-glow)' }}>{deal.code || deal.id}</span>
                             <span className="coupon-discount" style={{ color: 'var(--error)' }}>{deal.discountPercent}% OFF</span>
                             <span className="coupon-expiry">Expires: {new Date(deal.expiresAt).toLocaleTimeString()}</span>
                             <span className={`coupon-status-pill ${isStatusActive ? 'active' : 'expired'}`} style={{ color: isStatusActive ? 'var(--error)' : 'var(--subtext)', background: isStatusActive ? 'var(--error-glow)' : 'var(--border)' }}>
-                              {isStatusActive ? 'LIVE FLASH' : 'CLOSED'}
+                              {isUsed ? 'USED' : isStatusActive ? 'LIVE FLASH' : 'CLOSED'}
                             </span>
                           </div>
                         );
@@ -1046,6 +1049,21 @@ export default function Admin() {
                     onChange={(e) => setNewCoupon(prev => ({ ...prev, expiryDate: e.target.value }))}
                   />
                   <span style={{ fontSize: '0.7rem', color: 'var(--subtext)' }}>Defaults to 30 days if empty.</span>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Category (optional)</label>
+                  <select
+                    className="form-input"
+                    value={newCoupon.applicableOn}
+                    onChange={(e) => setNewCoupon(prev => ({ ...prev, applicableOn: e.target.value }))}
+                  >
+                    <option value="">All Categories</option>
+                    {categories.filter(c => c !== 'All').map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--subtext)' }}>Leave blank to apply to all products.</span>
                 </div>
 
                 <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
