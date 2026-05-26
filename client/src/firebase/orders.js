@@ -90,6 +90,7 @@ export const seedOrders = async (orders) => {
         newDate: order.newDate || '',
         delayReason: order.delayReason || '',
         trackingNumber: order.trackingNumber || '',
+        itemCount: order.items?.length || 1,
         timeline: order.timeline || [
           { status: 'Confirmed', date: order.orderDate || '', completed: true },
           { status: order.status, date: new Date().toISOString(), completed: order.status === 'Delivered' }
@@ -102,5 +103,50 @@ export const seedOrders = async (orders) => {
     console.error('Error seeding orders:', error);
     throw error;
   }
+};
+
+/**
+ * Create a new order in RTDB.
+ * @param {object} params - { customerId, items, total, address }
+ * @returns {Promise<string>} The new order ID
+ */
+export const createOrder = async ({ customerId, items, total, address = '', couponCode = '', couponDiscount = 0 }) => {
+  const now = new Date();
+  const random = Math.random().toString(36).substring(2, 6);
+  const orderId = `ord_${Date.now()}_${random}`;
+  const orderRef = ref(db, `${PATH_NAME}/${orderId}`);
+
+  const trackingNumber = `TRK-${orderId.slice(0, 8).toUpperCase()}`;
+
+  const productName = items.length === 1
+    ? items[0].name
+    : `${items[0].name} + ${items.length - 1} more`;
+
+  await set(orderRef, {
+    customerId,
+    productId: items[0]?.productId || '',
+    productName,
+    price: Number(total) || 0,
+    couponCode,
+    couponDiscount: Number(couponDiscount) || 0,
+    status: 'Confirmed',
+    orderDate: now.toISOString(),
+    estimatedDelivery: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    newDate: '',
+    delayReason: '',
+    trackingNumber,
+    shippingAddress: address,
+    items: items.map((i) => ({
+      productId: i.productId,
+      name: i.name,
+      price: i.price,
+      quantity: i.quantity || 1,
+    })),
+    timeline: [
+      { status: 'Confirmed', date: now.toISOString(), completed: true },
+    ],
+  });
+
+  return orderId;
 };
 

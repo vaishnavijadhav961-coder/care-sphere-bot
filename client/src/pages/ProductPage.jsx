@@ -1,36 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRealtimeListener } from '../hooks/useRealtimeListener';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { addToNotifyList } from '../firebase/products';
+import { addToCart } from '../firebase/cart';
+import { useAuth } from '../hooks/AuthContext';
 
 const CATEGORY_ICONS = {
   smartphones: '📱', footwear: '👟', skincare: '✨',
   headphones: '🎧', luggage: '🧳', electronics: '💻',
 };
 
-async function addToNotifyList(productId, customerId = 'user123') {
-  try {
-    const ref = doc(db, 'products', productId);
-    await updateDoc(ref, { notifyList: arrayUnion(customerId) });
-    return true;
-  } catch (e) {
-    console.error('notify failed', e);
-    return false;
-  }
-}
-
 export default function ProductPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: products, loading } = useRealtimeListener('products');
   const [notified, setNotified] = useState(false);
   const [notifying, setNotifying] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [quantity, setQuantity] = useState(1);
 
   const product = products.find((p) => p.id === id);
   const discountedPrice = product?.discount
     ? Math.round(product.price * (1 - product.discount / 100))
     : null;
+
+  const handleAddToCart = async () => {
+    if (!user) { navigate('/login'); return; }
+    setAdding(true);
+    await addToCart(user.uid, product, quantity);
+    setAdding(false);
+  };
+
+  const handleBuyNow = () => {
+    if (!user) { navigate('/login'); return; }
+    navigate(`/checkout?buyNow=${product.id}&qty=${quantity}`);
+  };
 
   const openChatWithContext = () => {
     if (!product) return;
@@ -41,7 +46,7 @@ export default function ProductPage() {
 
   const handleNotify = async () => {
     setNotifying(true);
-    const ok = await addToNotifyList(product.id);
+    const ok = await addToNotifyList(product.id, 'user123');
     setNotifying(false);
     if (ok) setNotified(true);
   };
@@ -87,7 +92,11 @@ export default function ProductPage() {
           {/* Left: Image */}
           <div className="pp-img-section">
             <div className="pp-img-box">
-              <span className="pp-img-icon">{CATEGORY_ICONS[product.category] || '📦'}</span>
+              {product.image ? (
+                <img src={product.image} alt={product.name} className="pp-img" />
+              ) : (
+                <span className="pp-img-icon">{CATEGORY_ICONS[product.category] || '📦'}</span>
+              )}
               {product.discount > 0 && (
                 <div className="pp-discount-badge">{product.discount}% OFF</div>
               )}
@@ -150,8 +159,29 @@ export default function ProductPage() {
               </div>
             )}
 
+            {/* Quantity selector */}
+            {product.inStock && (
+              <div className="pp-qty-row">
+                <span className="pp-qty-label">Qty:</span>
+                <button className="pp-qty-btn" onClick={() => setQuantity(q => Math.max(1, q - 1))}>−</button>
+                <span className="pp-qty-value">{quantity}</span>
+                <button className="pp-qty-btn" onClick={() => setQuantity(q => Math.min(product.stock || 99, q + 1))}>+</button>
+                <span className="pp-qty-max">max {product.stock}</span>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="pp-actions">
+              {product.inStock && (
+                <>
+                  <button className="pp-cart-btn" onClick={handleAddToCart} disabled={adding}>
+                    {adding ? 'Adding...' : '🛒 Add to Cart'}
+                  </button>
+                  <button className="pp-buy-btn" onClick={handleBuyNow}>
+                    Buy Now
+                  </button>
+                </>
+              )}
               <button className="pp-ask-btn" onClick={openChatWithContext}>
                 ? Ask CareSphere
               </button>
@@ -226,6 +256,12 @@ const baseStyles = `
     overflow: hidden;
   }
   .pp-img-icon { font-size: 7rem; }
+  .pp-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 20px;
+  }
   .pp-discount-badge {
     position: absolute;
     top: 1rem;
@@ -346,10 +382,16 @@ const baseStyles = `
     font-weight: 500;
   }
 
+  .pp-qty-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; }
+  .pp-qty-label { font-size: 0.85rem; font-weight: 600; color: #374151; }
+  .pp-qty-btn { width: 32px; height: 32px; border-radius: 8px; border: 1px solid #D1D5DB; background: #fff; font-size: 1.1rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #374151; transition: all 0.15s; }
+  .pp-qty-btn:hover { background: #F3F4F6; border-color: #9CA3AF; }
+  .pp-qty-value { font-size: 1rem; font-weight: 700; min-width: 28px; text-align: center; font-family: 'DM Mono', monospace; }
+  .pp-qty-max { font-size: 0.7rem; color: #9CA3AF; font-family: 'DM Mono', monospace; }
   .pp-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.5rem; }
-  .pp-ask-btn {
+  .pp-cart-btn {
     flex: 1;
-    min-width: 160px;
+    min-width: 140px;
     padding: 0.75rem 1.25rem;
     background: #2563EB;
     color: #fff;
@@ -361,7 +403,38 @@ const baseStyles = `
     cursor: pointer;
     transition: background 0.2s;
   }
-  .pp-ask-btn:hover { background: #1D4ED8; }
+  .pp-cart-btn:hover { background: #1D4ED8; }
+  .pp-cart-btn:disabled { opacity: 0.7; cursor: default; }
+  .pp-buy-btn {
+    flex: 1;
+    min-width: 140px;
+    padding: 0.75rem 1.25rem;
+    background: #F59E0B;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Sora', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .pp-buy-btn:hover { background: #D97706; }
+  .pp-ask-btn {
+    flex: 1;
+    min-width: 140px;
+    padding: 0.75rem 1.25rem;
+    background: #EFF6FF;
+    color: #2563EB;
+    border: 1.5px solid #BFDBFE;
+    border-radius: 12px;
+    font-family: 'Sora', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .pp-ask-btn:hover { background: #DBEAFE; }
   .pp-notify-btn {
     flex: 1;
     min-width: 160px;

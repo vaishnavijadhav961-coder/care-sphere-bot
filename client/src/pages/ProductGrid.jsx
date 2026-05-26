@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRealtimeListener } from '../hooks/useRealtimeListener';
-import { updateProductStock } from '../firebase/products';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { updateProductStock, addToNotifyList } from '../firebase/products';
+import { addToCart } from '../firebase/cart';
+import { useAuth } from '../hooks/AuthContext';
+import TopNav from '../components/TopNav';
 
 const CATEGORIES = ['All', 'smartphones', 'footwear', 'skincare', 'headphones', 'luggage', 'electronics'];
 
@@ -27,23 +28,19 @@ const CATEGORY_ICONS = {
   electronics: '💻',
 };
 
-// Notify helper — writes customerId to product's notifyList in Firestore
-async function addToNotifyList(productId, customerId = 'user123') {
-  try {
-    const ref = doc(db, 'products', productId);
-    await updateDoc(ref, { notifyList: arrayUnion(customerId) });
-    return true;
-  } catch (e) {
-    // fallback: use updateProductStock path isn't available, silently fail
-    console.error('notify failed', e);
-    return false;
-  }
-}
-
-function ProductCard({ product, onAskCareSphere }) {
+function ProductCard({ product, onAskCareSphere, user }) {
   const navigate = useNavigate();
   const [notified, setNotified] = useState(false);
   const [notifying, setNotifying] = useState(false);
+  const [adding, setAdding] = useState(false);
+
+  const handleAddToCart = async (e) => {
+    e.stopPropagation();
+    if (!user) { navigate('/login'); return; }
+    setAdding(true);
+    await addToCart(user.uid, product);
+    setAdding(false);
+  };
   const discountedPrice = product.discount
     ? Math.round(product.price * (1 - product.discount / 100))
     : null;
@@ -51,7 +48,7 @@ function ProductCard({ product, onAskCareSphere }) {
   const handleNotify = async (e) => {
     e.stopPropagation();
     setNotifying(true);
-    const ok = await addToNotifyList(product.id);
+    const ok = await addToNotifyList(product.id, 'user123');
     setNotifying(false);
     if (ok) setNotified(true);
   };
@@ -72,9 +69,13 @@ function ProductCard({ product, onAskCareSphere }) {
       )}
 
       <div className="p2-card-img-wrap">
-        <div className="p2-card-img-placeholder">
-          {CATEGORY_ICONS[product.category] || '📦'}
-        </div>
+        {product.image ? (
+          <img src={product.image} alt={product.name} className="p2-card-img" />
+        ) : (
+          <div className="p2-card-img-placeholder">
+            {CATEGORY_ICONS[product.category] || '📦'}
+          </div>
+        )}
       </div>
 
       <div className="p2-card-body">
@@ -93,12 +94,17 @@ function ProductCard({ product, onAskCareSphere }) {
 
         <div className="p2-card-actions" onClick={(e) => e.stopPropagation()}>
           {product.inStock ? (
-            <button
-              className="p2-ask-btn"
-              onClick={() => onAskCareSphere({ productId: product.id, productName: product.name })}
-            >
-              ? Ask CareSphere
-            </button>
+            <>
+              <button
+                className="p2-ask-btn"
+                onClick={() => onAskCareSphere({ productId: product.id, productName: product.name })}
+              >
+                ? Ask CareSphere
+              </button>
+              <button className="p2-cart-btn" onClick={handleAddToCart} disabled={adding}>
+                {adding ? 'Adding...' : 'Add to Cart'}
+              </button>
+            </>
           ) : notified ? (
             <button className="p2-notify-btn p2-notify-done" disabled>✓ You'll be notified</button>
           ) : (
@@ -113,6 +119,7 @@ function ProductCard({ product, onAskCareSphere }) {
 }
 
 export default function ProductGrid() {
+  const { user } = useAuth();
   const { data: products, loading } = useRealtimeListener('products');
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
@@ -157,29 +164,6 @@ export default function ProductGrid() {
           color: #111827;
         }
 
-        /* HEADER */
-        .p2-header {
-          background: #fff;
-          border-bottom: 1px solid #E5E7EB;
-          padding: 0 2rem;
-          height: 64px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          position: sticky;
-          top: 0;
-          z-index: 100;
-          gap: 1rem;
-        }
-        .p2-logo {
-          font-weight: 700;
-          font-size: 1.25rem;
-          color: #2563EB;
-          letter-spacing: -0.03em;
-          white-space: nowrap;
-          text-decoration: none;
-        }
-        .p2-logo span { color: #10B981; }
         .p2-search-wrap {
           flex: 1;
           max-width: 420px;
@@ -331,6 +315,11 @@ export default function ProductGrid() {
           font-size: 3.5rem;
           opacity: 0.85;
         }
+        .p2-card-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
         .p2-card-body {
           padding: 1rem;
           display: flex;
@@ -420,6 +409,22 @@ export default function ProductGrid() {
           border-color: #BBF7D0;
           color: #15803D;
         }
+        .p2-cart-btn {
+          width: 100%;
+          padding: 0.5rem;
+          background: #2563EB;
+          border: none;
+          border-radius: 8px;
+          color: #fff;
+          font-family: 'Sora', sans-serif;
+          font-size: 0.8rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.15s;
+          margin-top: 0.35rem;
+        }
+        .p2-cart-btn:hover { background: #1D4ED8; }
+        .p2-cart-btn:disabled { opacity: 0.7; cursor: default; }
 
         /* LOADING / EMPTY */
         .p2-loading {
@@ -443,7 +448,6 @@ export default function ProductGrid() {
 
         /* RESPONSIVE */
         @media (max-width: 640px) {
-          .p2-header { padding: 0 1rem; }
           .p2-main { padding: 1rem; }
           .p2-cat-bar { padding: 0.75rem 1rem; }
           .p2-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
@@ -453,10 +457,8 @@ export default function ProductGrid() {
       `}</style>
 
       <div className="p2-page">
-        {/* Header */}
-        <header className="p2-header">
-          <a href="/products" className="p2-logo">Care<span>Sphere</span></a>
-          <div className="p2-search-wrap">
+        <TopNav>
+          <div className="p2-search-wrap" style={{ flex: 1, maxWidth: 420, position: 'relative' }}>
             <span className="p2-search-icon">🔍</span>
             <input
               className="p2-search"
@@ -476,7 +478,7 @@ export default function ProductGrid() {
             <option value="rating">Top Rated</option>
             <option value="discount">Best Deals</option>
           </select>
-        </header>
+        </TopNav>
 
         {/* Category Pills */}
         <div className="p2-cat-bar">
@@ -517,6 +519,7 @@ export default function ProductGrid() {
                     <ProductCard
                       key={product.id}
                       product={product}
+                      user={user}
                       onAskCareSphere={openChatWithContext}
                     />
                   ))}
