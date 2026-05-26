@@ -16,6 +16,13 @@ export const useRealtimeListener = (path, orderByField = null, direction = 'desc
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (!path) {
+      setData([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 

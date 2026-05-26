@@ -17,7 +17,6 @@ import { getProducts } from '../firebase/products';
 import { getOrders } from '../firebase/orders';
 import { buildMasterPrompt } from './masterPrompt';
 import { hasFlashDeal, hasEscalate, stripTags, getRedirectPath } from './tagDetection';
-import { createEscalation } from '../firebase/escalations';
 import { db } from '../firebase/config';
 import { ref, get } from 'firebase/database';
 
@@ -39,18 +38,31 @@ const withTimeout = (promise, ms, fallback) =>
   ]);
 
 /**
- * Fetch all coupons from RTDB.
+ * Fetch all coupons from RTDB via REST API.
+ * Uses direct HTTP fetch instead of Firebase SDK to bypass stale local cache.
  */
 async function fetchCoupons() {
   try {
-    const snap = await get(ref(db, 'coupons'));
-    if (!snap.exists()) return [];
-    const result = [];
-    snap.forEach((child) => result.push({ id: child.key, ...child.val() }));
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'care-sphere-bot';
+    const databaseURL = import.meta.env.VITE_FIREBASE_DATABASE_URL ||
+      `https://${projectId}-default-rtdb.firebaseio.com/`;
+    const res = await fetch(`${databaseURL}coupons.json`);
+    if (!res.ok) {
+      console.warn('[fetchCoupons] REST API error:', res.status);
+      return [];
+    }
+    const data = await res.json();
+    if (!data) {
+      console.warn('[fetchCoupons] No coupons found via REST');
+      return [];
+    }
+    const result = Object.entries(data).map(([key, val]) => ({ id: key, code: key, ...val }));
+    console.log('[fetchCoupons] Fetched', result.length, 'coupon(s) via REST:',
+      result.map(c => ({ code: c.code, isActive: c.isActive, expiryDate: c.expiryDate })));
     return result;
   } catch (err) {
-    console.error('fetchCoupons error:', err);
-    return []; // fail silently — don't block the chat
+    console.error('[fetchCoupons] Error:', err);
+    return [];
   }
 }
 
@@ -58,7 +70,24 @@ async function fetchCoupons() {
  * Filter orders to only those belonging to our demo customer.
  */
 function filterCustomerOrders(orders, customerId) {
-  return orders.filter((o) => o.customerId === customerId);
+  if (!customerId) return [];
+  return orders.filter(o => o.customerId === customerId);
+}
+
+async function fetchCart(customerId) {
+  if (!customerId) return [];
+  try {
+    const cartRef = ref(db, `carts/${customerId}`);
+    const snap = await get(cartRef);
+    if (!snap.exists()) return [];
+    const items = [];
+    snap.forEach((child) => {
+      items.push({ id: child.key, ...child.val() });
+    });
+    return items;
+  } catch {
+    return [];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -121,7 +150,7 @@ async function callGemini(systemPrompt, history) {
 /**
  * Normalizes raw Gemini history format into flat ticket escalations history format
  */
-function normalizeHistoryToEscalation(history) {
+export function normalizeHistoryToEscalation(history) {
   return history.map((item, idx) => {
     let sender = 'bot';
     if (item.role === 'user') sender = 'customer';
@@ -145,51 +174,6 @@ function normalizeHistoryToEscalation(history) {
   });
 }
 
-/**
- * Generate a structured escalation summary via Gemini, then save to RTDB.
- *
- * @param {Array}  conversationHistory - Full chat history
- * @param {string} customerId
- * @param {string} escalationReason
- */
-async function triggerEscalation(conversationHistory, customerId, escalationReason) {
-  try {
-    const summaryPrompt = `You are a customer support supervisor assistant.
-A conversation needs escalation. Write a ONE SENTENCE summary (max 30 words) covering: customer's problem, product/order, and why bot failed. Be concise.
-
-Customer ID: ${customerId}
-
-Conversation:
-${JSON.stringify(conversationHistory, null, 2)}`;
-
-    // Use a minimal history array for the summary call — just the prompt
-    const summaryHistory = [
-      { role: 'user', parts: [{ text: summaryPrompt }] },
-    ];
-
-    let summary = 'Summary unavailable — please review chat history.';
-    try {
-      summary = await callGemini('You are a concise, professional summarizer.', summaryHistory);
-    } catch (err) {
-      console.error('Failed to generate escalation summary:', err);
-    }
-
-    await createEscalation({
-      customerId,
-      reason: escalationReason,
-      summary,
-      chatHistory: normalizeHistoryToEscalation(conversationHistory),
-      status: 'open',
-      agentId: '',
-      createdAt: new Date().toISOString(),
-    });
-
-    console.log('Escalation saved to RTDB.');
-  } catch (err) {
-    console.error('triggerEscalation error:', err);
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
@@ -209,29 +193,18 @@ export async function handleMessage(customerMessage, conversationHistory, contex
 
   try {
     // 1. Fetch live data from RTDB with timeouts to prevent hanging the UI
-    const [products, allOrders, coupons] = await Promise.all([
+    const [products, allOrders, coupons, cart] = await Promise.all([
       withTimeout(getProducts(), 4000, []),
       withTimeout(getOrders(), 4000, []),
       withTimeout(fetchCoupons(), 4000, []),
+      withTimeout(fetchCart(customerId), 4000, []),
     ]);
     const orders = filterCustomerOrders(allOrders, customerId);
 
     // 2. Build master prompt with injected data
-    const systemPrompt = buildMasterPrompt({ products, orders, coupons, mode, productContext });
+    const systemPrompt = buildMasterPrompt({ products, orders, coupons, cart, mode, productContext, customerId });
 
     // 3. Append new customer message to history for this call
-    const cleanFullHistory = [
-      ...conversationHistory,
-      {
-        role: 'user',
-        parts: [
-          {
-            text: customerMessage
-          }
-        ]
-      }
-    ];
-
     const fullHistory = [
       ...conversationHistory,
       {
@@ -244,26 +217,19 @@ export async function handleMessage(customerMessage, conversationHistory, contex
       },
     ];
 
-    // 4. Call Gemini
+    // 5. Call Gemini
     const rawReply = await callGemini(systemPrompt, fullHistory);
 
-    // 5. Detect special tags from the raw output
+    // 6. Detect special tags from the raw output
     const showFlashDeal = hasFlashDeal(rawReply);
     const escalated = hasEscalate(rawReply);
     const redirectPath = getRedirectPath(rawReply);
 
-    // 6. Programmatically extract only the final customer-facing text
+    // 7. Programmatically extract only the final customer-facing text
     const cleanExtracted = extractResponseText(rawReply);
 
-    // 7. Strip special tags from the clean response
+    // 8. Strip special tags from the clean response
     const reply = stripTags(cleanExtracted);
-
-    // 8. If escalation triggered — generate summary and save to RTDB
-    if (escalated) {
-      const reason = extractEscalationReason(conversationHistory, customerMessage);
-      // Fire-and-forget — don't block the UI
-      triggerEscalation(cleanFullHistory, customerId, reason);
-    }
 
     return { reply, showFlashDeal, escalated, redirectPath };
   } catch (error) {
@@ -281,24 +247,6 @@ export async function handleMessage(customerMessage, conversationHistory, contex
 // ---------------------------------------------------------------------------
 // Utility
 // ---------------------------------------------------------------------------
-
-/**
- * Extract a human-readable escalation reason from the conversation.
- * Simple heuristic — can be improved.
- */
-function extractEscalationReason(history, lastMessage) {
-  const lower = lastMessage.toLowerCase();
-  if (lower.includes('human') || lower.includes('agent') || lower.includes('person')) {
-    return 'Customer explicitly requested a human agent';
-  }
-  if (lower.includes('court') || lower.includes('legal')) {
-    return 'Customer mentioned legal action';
-  }
-  if (history.length >= 6) {
-    return 'Unresolved query after multiple bot attempts';
-  }
-  return 'Escalated by bot — see chat history for details';
-}
 
 /**
  * Programmatically extracts the customer-facing message inside <response> tags.

@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { handleMessage } from '../bot/bot';
+import { handleMessage, normalizeHistoryToEscalation } from '../bot/bot';
 import { checkExistingFlashDeal, createFlashDealCode } from '../firebase/flashDeals';
 import { db } from '../firebase/config';
 import { ref, onValue } from 'firebase/database';
-import { addMessageToEscalation, resolveEscalation } from '../firebase/escalations';
+import { addMessageToEscalation, resolveEscalation, createEscalation } from '../firebase/escalations';
+import { useAuth } from '../hooks/AuthContext';
+import { removeFromCart } from '../firebase/cart';
 import './ChatWidget.css';
-
-const CUSTOMER_ID = 'user123';
 
 const QUIZ_CATEGORIES = [
   { label: '📱 Electronics', value: 'electronics' },
@@ -17,10 +17,13 @@ const QUIZ_CATEGORIES = [
 ];
 
 function generateCode() {
-  return 'QUIZ' + Math.floor(10 + Math.random() * 90);
+  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const suffix = Date.now().toString(36).slice(-3).toUpperCase();
+  return 'FLASH' + rand + suffix;
 }
 
 export default function ChatWidget({ initialProductContext = null }) {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -45,7 +48,7 @@ export default function ChatWidget({ initialProductContext = null }) {
   // -------------------------------------------------------------------------
   useEffect(() => {
     const greeting = productContext
-      ? `Hi! 👋 I see you're looking at **${productContext.name}**. What would you like to know about it?`
+      ? `Hi! 👋 I see you're looking at **${productContext.productName}**. What would you like to know about it?`
       : "Hi there! 👋 I'm CareSphere, your personal shopping assistant. How can I help you today?";
 
     setMessages([{ role: 'bot', text: greeting, id: Date.now() }]);
@@ -61,7 +64,7 @@ export default function ChatWidget({ initialProductContext = null }) {
         let activeEsc = null;
         snapshot.forEach((childSnap) => {
           const esc = childSnap.val();
-          if (esc && typeof esc === 'object' && esc.customerId === CUSTOMER_ID && esc.status === 'open') {
+          if (esc && typeof esc === 'object' && esc.customerId === (user?.uid || null) && esc.status === 'open') {
             activeEsc = { id: childSnap.key, ...esc };
           }
         });
@@ -163,7 +166,7 @@ export default function ChatWidget({ initialProductContext = null }) {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   // -------------------------------------------------------------------------
   // Proactive Delay Notifications (Realtime Database)
@@ -175,7 +178,7 @@ export default function ChatWidget({ initialProductContext = null }) {
         snapshot.forEach((childSnap) => {
           const order = childSnap.val();
           const orderId = childSnap.key;
-          if (order && typeof order === 'object' && order.customerId === CUSTOMER_ID && order.status === 'Delayed') {
+          if (order && typeof order === 'object' && order.customerId === (user?.uid || null) && order.status === 'Delayed') {
             // Check if notified in sessionStorage
             const notifiedKey = `notified_delay_${orderId}`;
             const isNotified = sessionStorage.getItem(notifiedKey);
@@ -184,7 +187,7 @@ export default function ChatWidget({ initialProductContext = null }) {
               sessionStorage.setItem(notifiedKey, 'true');
 
               // Trigger alert toast/message
-              const proactiveMsg = `⚠️ **Proactive Shipping Update**: Your order for **${order.productName || 'unknown product'}** (ID: ${orderId}) has been delayed due to *${order.delayReason || 'unforeseen logistical bottlenecks'}*. Estimated delivery is now **${order.estimatedDelivery ? new Date(order.estimatedDelivery).toLocaleDateString() : 'TBD'}**. \nTrack here: /track/${orderId}`;
+              const proactiveMsg = `⚠️ **Proactive Shipping Update**: Your order for **${order.productName || 'unknown product'}** (ID: ${orderId}) has been delayed due to *${order.delayReason || 'unforeseen logistical bottlenecks'}*. Estimated delivery is now **${order.estimatedDelivery ? new Date(order.estimatedDelivery).toLocaleDateString() : 'TBD'}**. \n[Track here](/track/${orderId})`;
               
               setMessages((prev) => [
                 ...prev,
@@ -213,13 +216,13 @@ export default function ChatWidget({ initialProductContext = null }) {
         snapshot.forEach((childSnap) => {
           const product = childSnap.val();
           const productId = childSnap.key;
-          if (product && typeof product === 'object' && product.notifyList && Array.isArray(product.notifyList) && product.notifyList.includes(CUSTOMER_ID)) {
+          if (product && typeof product === 'object' && product.notifyList && Array.isArray(product.notifyList) && product.notifyList.includes(user?.uid || null)) {
             // Only notify if previously out of stock and now in stock
             const notifiedKey = `notified_instock_${productId}`;
             const wasNotified = sessionStorage.getItem(notifiedKey);
             if (product.inStock === true && !wasNotified) {
               sessionStorage.setItem(notifiedKey, 'true');
-              const inStockMsg = `📦 **Good news!** **${product.name}** is back in stock! 🎉\nYou asked us to let you know — and it's available now. Check it out → /products/${product.pageUrl || productId}`;
+              const inStockMsg = `📦 **Good news!** [${product.name}](/products/${productId}) is back in stock! 🎉\nYou asked us to let you know — and it's available now.`;
               setMessages((prev) => [
                 ...prev,
                 {
@@ -262,7 +265,7 @@ export default function ChatWidget({ initialProductContext = null }) {
       setProductContext(productData);
       setIsOpen(true);
       if (productData) {
-        const ctxMsg = `Hi! 👋 I see you're looking at **${productData.name}**. What would you like to know about it?`;
+        const ctxMsg = `Hi! 👋 I see you're looking at **${productData.productName}**. What would you like to know about it?`;
         setMessages([{ role: 'bot', text: ctxMsg, id: Date.now() }]);
         historyRef.current = [];
       }
@@ -296,9 +299,10 @@ export default function ChatWidget({ initialProductContext = null }) {
     setIsTyping(true);
 
     try {
+      const customerId = user?.uid || null;
       const result = await handleMessage(text, historyRef.current, {
         mode,
-        customerId: CUSTOMER_ID,
+        customerId,
         productContext,
       });
 
@@ -312,7 +316,19 @@ export default function ChatWidget({ initialProductContext = null }) {
       setIsTyping(false);
 
       // Add bot reply
-      const botMsg = { role: 'bot', text: result.reply, id: Date.now() + 1 };
+      let replyText = result.reply;
+
+      // Parse CART_REMOVE tags
+      const cartRemoveMatch = replyText.match(/\[CART_REMOVE:\s*([^\]]+)\]/);
+      if (cartRemoveMatch && user?.uid) {
+        const ids = cartRemoveMatch[1].split(',').map((s) => s.trim()).filter(Boolean);
+        for (const prodId of ids) {
+          await removeFromCart(user.uid, prodId);
+        }
+        replyText = replyText.replace(/\[CART_REMOVE:\s*[^\]]+\]\s*/g, '');
+      }
+
+      const botMsg = { role: 'bot', text: replyText, id: Date.now() + 1 };
       setMessages((prev) => [...prev, botMsg]);
 
       if (!isOpen) setHasUnread(true);
@@ -327,15 +343,33 @@ export default function ChatWidget({ initialProductContext = null }) {
       // Handle Flash Deal
       if (result.showFlashDeal && !quizAnswered) {
         // Check if customer already has an active deal
-        const existing = await checkExistingFlashDeal(CUSTOMER_ID);
+        const existing = user?.uid ? await checkExistingFlashDeal(user.uid) : null;
         if (!existing) {
           setShowQuiz(true);
         }
       }
 
-      // Handle Escalation
+      // Handle Escalation — immediately transition to human-agent mode
       if (result.escalated) {
         setShowQuiz(false);
+        try {
+          const chatHistory = normalizeHistoryToEscalation(historyRef.current);
+          const lastCustomerMsg = chatHistory.filter(m => m.sender === 'customer').pop();
+          const summary = lastCustomerMsg
+            ? `Customer: ${lastCustomerMsg.message.slice(0, 100)}`
+            : 'Customer requested human agent';
+          const escId = await createEscalation({
+            customerId: user?.uid || 'anonymous',
+            chatHistory,
+            summary,
+            status: 'open',
+            createdAt: new Date().toISOString(),
+          });
+          setEscalated(true);
+          setActiveEscalationId(escId);
+        } catch (err) {
+          console.error('Failed to create escalation from frontend:', err);
+        }
       }
     } catch (err) {
       console.error('sendMessage error:', err);
@@ -387,7 +421,7 @@ export default function ChatWidget({ initialProductContext = null }) {
 
     const code = generateCode();
     try {
-      await createFlashDealCode(CUSTOMER_ID, code, 15);
+      await createFlashDealCode(user?.uid || 'anonymous', code, 15);
     } catch (err) {
       console.error('Failed to save flash deal code:', err);
     }
@@ -412,38 +446,49 @@ export default function ChatWidget({ initialProductContext = null }) {
   // -------------------------------------------------------------------------
   // Render helpers
   // -------------------------------------------------------------------------
-  const renderMessageText = (text) => {
+   const renderMessageText = (text) => {
     if (!text || typeof text !== 'string') return '';
-    // 1. Split by bold markdown (**bold**) first
-    const parts = text.split(/(\*\*[^*]+\*\*)/g);
-    return parts.map((part, i) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={i}>{part.slice(2, -2)}</strong>;
+    // 0. Split by markdown links [text](url) first
+    const linkParts = text.split(/(\[[^\]]+\]\([^)]+\))/g);
+    return linkParts.map((part, i) => {
+      const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      if (linkMatch) {
+        const linkText = linkMatch[1];
+        const linkUrl = linkMatch[2];
+        const renderedText = linkText.split(/(\*\*[^*]+\*\*)/g).map((t, ti) =>
+          t.startsWith('**') && t.endsWith('**')
+            ? <strong key={ti}>{t.slice(2, -2)}</strong>
+            : t
+        );
+        return (
+          <button key={i} className="cw-inline-link-btn" onClick={() => navigate(linkUrl)} title={linkUrl}>
+            {renderedText}
+          </button>
+        );
       }
-      
-      // 2. Parse paths starting with / (e.g. /products/abc, /track/123, /coupons, /compare?...)
-      const subparts = part.split(/(\/(?:products|track|compare|coupons)(?:\/[\w_-]+)?(?:\?\S+)?)/g);
-      
-      return subparts.map((subpart, idx) => {
-        if (subpart.startsWith('/')) {
-          return (
-            <button
-              key={`${i}-${idx}`}
-              className="cw-inline-link-btn"
-              onClick={() => navigate(subpart)}
-              title={`Go to ${subpart}`}
-            >
-              {subpart}
-            </button>
-          );
+      // 1. Split by bold markdown (**bold**)
+      const boldParts = part.split(/(\*\*[^*]+\*\*)/g);
+      return boldParts.map((bp, j) => {
+        if (bp.startsWith('**') && bp.endsWith('**')) {
+          return <strong key={`${i}-${j}`}>{bp.slice(2, -2)}</strong>;
         }
-        
-        return subpart.split('\n').map((line, j, arr) => (
-          <React.Fragment key={`${i}-${idx}-${j}`}>
-            {line}
-            {j < arr.length - 1 && <br />}
-          </React.Fragment>
-        ));
+        // 2. Parse paths starting with / (e.g. /products/abc, /track/123, /coupons, /compare?...)
+        const subparts = bp.split(/(\/(?:products|track|compare|coupons)(?:\/[\w_-]+)?(?:\?\S+)?)/g);
+        return subparts.map((subpart, k) => {
+          if (subpart.startsWith('/')) {
+            return (
+              <button key={`${i}-${j}-${k}`} className="cw-inline-link-btn" onClick={() => navigate(subpart)} title={subpart}>
+                {subpart}
+              </button>
+            );
+          }
+          return subpart.split('\n').map((line, l, arr) => (
+            <React.Fragment key={`${i}-${j}-${k}-${l}`}>
+              {line}
+              {l < arr.length - 1 && <br />}
+            </React.Fragment>
+          ));
+        });
       });
     });
   };
