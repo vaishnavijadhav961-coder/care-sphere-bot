@@ -56,24 +56,24 @@ care-sphere-bot/
 │       │   ├── coupons.js        # Validate, create, seed coupons
 │       │   ├── flashDeals.js     # Flash deal code generation + validation
 │       │   ├── escalations.js    # Human support ticket CRUD
-│       │   └── chatSessions.js   # Per-account chat history persistence
+│       │   ├── chatSessions.js   # Per-account chat history persistence
+│       │   └── utils.js          # Shared helpers (snapshotToArray, etc.)
 │       ├── bot/
 │       │   ├── bot.js            # Core: calls Gemini with live data injection
 │       │   ├── masterPrompt.js   # System prompt with 15 rules + modes
-│       │   └── tagDetection.js   # Parse [FLASH_DEAL] [ESCALATE] [FAILURE] [REDIRECT] [CART_REMOVE] tags
+│       │   └── tagDetection.js   # Parse [FLASH_DEAL] [ESCALATE] [FAILURE] [REDIRECT] [CART_REMOVE] [CART_UPDATE] tags
 │       ├── components/
 │       │   ├── TopNav.jsx        # Sticky nav, cart badge, user dropdown, theme toggle
-│       │   ├── ChatWidget.jsx    # Floating chatbot (661 lines) — main product
-│       │   └── ChatWidget.css    # Chat UI styling (556 lines)
+│       │   ├── ChatWidget.jsx    # Floating chatbot — main product
+│       │   └── ChatWidget.css    # Chat UI styling
 │       └── pages/
-│           ├── Admin.jsx         # 4-tab admin dashboard (1155 lines)
+│           ├── Admin.jsx         # 4-tab admin dashboard
 │           ├── ProductGrid.jsx   # Product listing with search, category, sort
 │           ├── ProductPage.jsx   # Single product detail page
 │           ├── Compare.jsx       # Side-by-side product comparison
 │           ├── Checkout.jsx      # Cart + coupon validation + place order
 │           ├── Track.jsx         # Order tracking with 4-step timeline
 │           ├── Orders.jsx        # User's order history
-│           ├── Account.jsx       # Account page with orders list
 │           ├── Coupons.jsx       # Coupon browser with category filter
 │           ├── Login.jsx         # Email/password login
 │           └── Register.jsx      # Email/password registration
