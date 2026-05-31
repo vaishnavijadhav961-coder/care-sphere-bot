@@ -1,7 +1,8 @@
-import React from 'react';
+
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/AuthContext';
 import { useRealtimeListener } from '../hooks/useRealtimeListener';
+import { formatDate } from '../firebase/utils';
 import TopNav from '../components/TopNav';
 
 const STATUS_COLORS = {
@@ -18,12 +19,6 @@ export default function Orders() {
   const { data: orders, loading } = useRealtimeListener('orders', 'orderDate', 'desc');
 
   const myOrders = orders.filter((o) => o.customerId === user?.uid);
-
-  const formatDate = (iso) => {
-    if (!iso) return '—';
-    try { return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }); }
-    catch { return iso; }
-  };
 
   return (
     <>
@@ -88,8 +83,6 @@ export default function Orders() {
 }
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-
   .ord-page {
     min-height: 100vh;
     background: #F9FAFB;

@@ -1,23 +1,42 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useCallback, useState } from 'react';
 
 const ThemeContext = createContext(null);
 
 const THEME_KEY = 'care-sphere-theme';
 
-export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(() => {
+function getStoredTheme() {
+  try {
     return localStorage.getItem(THEME_KEY) || 'light';
-  });
+  } catch {
+    return 'light';
+  }
+}
+
+function storeTheme(theme) {
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+  } catch {
+    // storage full or unavailable — silently ignore
+  }
+}
+
+export function ThemeProvider({ children }) {
+  const [theme, setTheme] = useState(getStoredTheme);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem(THEME_KEY, theme);
+    storeTheme(theme);
   }, [theme]);
 
-  const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  const toggleTheme = useCallback(
+    () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark')),
+    []
+  );
+
+  const value = useMemo(() => ({ theme, toggleTheme }), [theme, toggleTheme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );

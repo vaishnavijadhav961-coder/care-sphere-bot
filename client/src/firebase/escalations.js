@@ -1,23 +1,14 @@
 import { db } from './config';
 import { ref, get, child, update, set } from 'firebase/database';
+import { snapshotToArray } from './utils';
 
 const PATH_NAME = 'escalations';
 
-/**
- * Fetch all escalations.
- * @returns {Promise<Array>} List of escalations
- */
 export const getEscalations = async () => {
   try {
     const dbRef = ref(db);
     const snapshot = await get(child(dbRef, PATH_NAME));
-    if (snapshot.exists()) {
-      const escalations = [];
-      snapshot.forEach((childSnapshot) => {
-        escalations.push({ id: childSnapshot.key, ...childSnapshot.val() });
-      });
-      return escalations;
-    }
+    if (snapshot.exists()) return snapshotToArray(snapshot);
     return [];
   } catch (error) {
     console.error('Error fetching escalations:', error);

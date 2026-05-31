@@ -1,6 +1,7 @@
-import React from 'react';
+
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRealtimeListener } from '../hooks/useRealtimeListener';
+import { formatDate } from '../firebase/utils';
 
 const TIMELINE_STEPS = ['Confirmed', 'Shipped', 'Out for Delivery', 'Delivered'];
 
@@ -48,13 +49,6 @@ export default function Track() {
       </>
     );
   }
-
-  const formatDate = (iso) => {
-    if (!iso) return null;
-    try {
-      return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-    } catch { return iso; }
-  };
 
   return (
     <>
@@ -172,8 +166,6 @@ export default function Track() {
 }
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-
   .trk-page {
     min-height: 100vh;
     background: #F9FAFB;

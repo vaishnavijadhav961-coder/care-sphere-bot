@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useRealtimeListener } from '../hooks/useRealtimeListener';
 import { updateOrderStatus, seedOrders } from '../firebase/orders';
 import { resolveEscalation, createEscalation, seedEscalations, addMessageToEscalation } from '../firebase/escalations';
@@ -56,6 +56,14 @@ export default function Admin() {
 
   // Seeding Status
   const [seedingStatus, setSeedingStatus] = useState('');
+  const seedTimeoutsRef = useRef([]);
+
+  useEffect(() => {
+    return () => {
+      seedTimeoutsRef.current.forEach(clearTimeout);
+      seedTimeoutsRef.current = [];
+    };
+  }, []);
 
   // Calculate Metrics
   const totalRevenue = orders.reduce((sum, o) => sum + (o.price || 0), 0);
@@ -308,10 +316,10 @@ export default function Admin() {
       await seedEscalations(mockEscalations);
 
       setSeedingStatus('Seeded successfully! 🌌');
-      setTimeout(() => setSeedingStatus(''), 4000);
+      seedTimeoutsRef.current.push(setTimeout(() => setSeedingStatus(''), 4000));
     } catch (err) {
       setSeedingStatus(`Seeding failed: ${err.message}`);
-      setTimeout(() => setSeedingStatus(''), 6000);
+      seedTimeoutsRef.current.push(setTimeout(() => setSeedingStatus(''), 6000));
     }
   };
 
@@ -489,7 +497,7 @@ export default function Admin() {
                 <div className="stat-icon-wrap revenue">💰</div>
                 <div className="stat-info">
                   <span className="stat-label">Cosmic Revenue</span>
-                  <span className="stat-value">${totalRevenue.toFixed(2)}</span>
+                  <span className="stat-value">₹{totalRevenue.toFixed(2)}</span>
                 </div>
               </div>
               <div className="stat-card">
@@ -721,7 +729,7 @@ export default function Admin() {
                         <td style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{order.id}</td>
                         <td>
                           <div>{order.productName}</div>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--subtext)' }}>Customer: {order.customerId} • ${Number(order.price || 0).toFixed(2)}</span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--subtext)' }}>Customer: {order.customerId} • ₹{Number(order.price || 0).toFixed(2)}</span>
                         </td>
                         <td style={{ fontSize: '0.8rem' }}>{new Date(order.orderDate).toLocaleDateString()}</td>
                         <td style={{ fontSize: '0.8rem' }}>

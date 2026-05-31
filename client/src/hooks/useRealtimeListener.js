@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
-import { ref, onValue, off, query, orderByChild } from 'firebase/database';
+import { ref, onValue, query, orderByChild } from 'firebase/database';
 
 /**
  * Reusable React Hook for listening to a Firebase Realtime Database path in Realtime.
@@ -54,12 +54,9 @@ export const useRealtimeListener = (path, orderByField = null, direction = 'desc
       setLoading(false);
     };
 
-    onValue(q, handleData, handleError);
+    const unsubscribe = onValue(q, handleData, handleError);
 
-    // Clean up subscription on unmount
-    return () => {
-      off(q, 'value', handleData);
-    };
+    return unsubscribe;
   }, [path, orderByField, direction]);
 
   return { data, loading, error };

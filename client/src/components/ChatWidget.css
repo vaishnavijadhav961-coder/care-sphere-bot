@@ -486,6 +486,118 @@
   }
 }
 
+/* ── Sessions panel ───────────────────────────────────────── */
+.cw-sessions {
+  position: absolute;
+  inset: 0;
+  background: var(--cw-card);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  animation: cw-slide-in 0.2s ease;
+}
+
+.cw-sessions__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--cw-border);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--cw-text);
+}
+
+.cw-sessions__new-btn {
+  background: var(--cw-primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cw-sessions__new-btn:hover {
+  background: var(--cw-primary-dark);
+}
+
+.cw-sessions__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.cw-sessions__empty {
+  text-align: center;
+  color: var(--cw-subtext);
+  font-size: 0.85rem;
+  padding: 24px 14px;
+}
+
+.cw-sessions__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 14px;
+  transition: background 0.15s;
+}
+
+.cw-sessions__item:hover {
+  background: var(--cw-bg);
+}
+
+.cw-sessions__item--active {
+  background: #eff6ff;
+}
+
+.cw-sessions__item-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 4px;
+  text-align: left;
+  min-width: 0;
+}
+
+.cw-sessions__item-preview {
+  font-size: 0.82rem;
+  color: var(--cw-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+.cw-sessions__item-time {
+  font-size: 0.7rem;
+  color: var(--cw-subtext);
+}
+
+.cw-sessions__del-btn {
+  background: none;
+  border: none;
+  color: var(--cw-subtext);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 6px;
+  border-radius: 50%;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.cw-sessions__del-btn:hover {
+  background: #fee2e2;
+  color: var(--cw-error);
+}
+
 /* ── Agent / Support Representative message bubble ── */
 .cw-msg--agent .cw-msg__bubble {
   background: linear-gradient(135deg, #eff6ff, #dbeafe) !important;

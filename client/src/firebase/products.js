@@ -1,23 +1,14 @@
 import { db } from './config';
-import { ref, get, child, update, set } from 'firebase/database';
+import { ref, get, child, update, set, runTransaction } from 'firebase/database';
+import { snapshotToArray } from './utils';
 
 const PATH_NAME = 'products';
 
-/**
- * Fetch all products from Realtime Database.
- * @returns {Promise<Array>} List of products
- */
 export const getProducts = async () => {
   try {
     const dbRef = ref(db);
     const snapshot = await get(child(dbRef, PATH_NAME));
-    if (snapshot.exists()) {
-      const products = [];
-      snapshot.forEach((childSnapshot) => {
-        products.push({ id: childSnapshot.key, ...childSnapshot.val() });
-      });
-      return products;
-    }
+    if (snapshot.exists()) return snapshotToArray(snapshot);
     return [];
   } catch (error) {
     console.error('Error fetching products:', error);
@@ -30,6 +21,26 @@ export const getProducts = async () => {
   * @param {string} productId - ID of the product
   * @param {number} newStock - New stock quantity
   */
+/**
+ * Atomically decrement product stock using a transaction.
+ * Prevents overselling when two orders race on the same product.
+ * @param {string} productId
+ * @param {number} quantity - Number to subtract from current stock
+ */
+export const decrementProductStock = async (productId, quantity) => {
+  try {
+    const productRef = ref(db, `${PATH_NAME}/${productId}`);
+    await runTransaction(productRef, (currentData) => {
+      if (!currentData) return;
+      const newStock = Math.max(0, (currentData.stock || 0) - quantity);
+      return { ...currentData, stock: newStock, inStock: newStock > 0 };
+    });
+  } catch (error) {
+    console.error(`Error decrementing stock for product ${productId}:`, error);
+    throw error;
+  }
+};
+
 export const updateProductStock = async (productId, newStock) => {
   try {
     const productRef = ref(db, `${PATH_NAME}/${productId}`);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRealtimeListener } from '../hooks/useRealtimeListener';
 import { addToNotifyList } from '../firebase/products';
@@ -28,7 +28,11 @@ export default function ProductPage() {
   const handleAddToCart = async () => {
     if (!user) { navigate('/login'); return; }
     setAdding(true);
-    await addToCart(user.uid, product, quantity);
+    try {
+      await addToCart(user.uid, product, quantity);
+    } catch (err) {
+      alert(err.message);
+    }
     setAdding(false);
   };
 
@@ -46,7 +50,7 @@ export default function ProductPage() {
 
   const handleNotify = async () => {
     setNotifying(true);
-    const ok = await addToNotifyList(product.id, 'user123');
+    const ok = await addToNotifyList(product.id, user?.uid);
     setNotifying(false);
     if (ok) setNotified(true);
   };
@@ -203,8 +207,6 @@ export default function ProductPage() {
 }
 
 const baseStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-
   .pp-page {
     min-height: 100vh;
     background: #F9FAFB;

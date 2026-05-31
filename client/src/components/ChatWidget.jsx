@@ -1,19 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { handleMessage, normalizeHistoryToEscalation } from '../bot/bot';
+import { handleMessage, normalizeHistoryToEscalation, generateSummary } from '../bot/bot';
 import { checkExistingFlashDeal, createFlashDealCode } from '../firebase/flashDeals';
 import { db } from '../firebase/config';
 import { ref, onValue } from 'firebase/database';
 import { addMessageToEscalation, resolveEscalation, createEscalation } from '../firebase/escalations';
 import { useAuth } from '../hooks/AuthContext';
-import { removeFromCart } from '../firebase/cart';
+import { removeFromCart, updateCartQuantity } from '../firebase/cart';
+import { getSessions, getSession, saveSession, deleteSession, generateSessionId } from '../firebase/chatSessions';
 import './ChatWidget.css';
 
 const QUIZ_CATEGORIES = [
   { label: '📱 Electronics', value: 'electronics' },
   { label: '👟 Footwear', value: 'footwear' },
   { label: '💄 Skincare', value: 'skincare' },
-  { label: '🏠 Home', value: 'home' },
 ];
 
 function generateCode() {
@@ -36,23 +36,68 @@ export default function ChatWidget({ initialProductContext = null }) {
   const [activeEscalationId, setActiveEscalationId] = useState(null);
   const [productContext, setProductContext] = useState(initialProductContext);
   const [hasUnread, setHasUnread] = useState(false);
+  const [sessions, setSessions] = useState([]);
+  const [showSessions, setShowSessions] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState(() => sessionStorage.getItem('cs_activeSessionId') || null);
   const prevEscalatedRef = useRef(false);
+  const escalationCooldownRef = useRef(false);
+  const userMsgCountRef = useRef(0);
+  const failureCountRef = useRef(0);
+  const autoEscalatedRef = useRef(false);
+  const lastChatHistoryRef = useRef(null);
 
   // Gemini conversation history (raw format for API)
   const historyRef = useRef([]);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const timeoutsRef = useRef([]);
+  const saveSessionTimerRef = useRef(null);
 
   // -------------------------------------------------------------------------
-  // Initial greeting
+  // Chat session initialization (load saved or show greeting)
   // -------------------------------------------------------------------------
   useEffect(() => {
-    const greeting = productContext
-      ? `Hi! 👋 I see you're looking at **${productContext.productName}**. What would you like to know about it?`
-      : "Hi there! 👋 I'm CareSphere, your personal shopping assistant. How can I help you today?";
+    if (!user?.uid) {
+      const greeting = productContext
+        ? `Hi! 👋 I see you're looking at **${productContext.productName}**. What would you like to know about it?`
+        : "Hi there! 👋 I'm CareSphere, your personal shopping assistant. How can I help you today?";
+      setMessages([{ role: 'bot', text: greeting, id: Date.now() }]);
+      return;
+    }
 
-    setMessages([{ role: 'bot', text: greeting, id: Date.now() }]);
-  }, []); // eslint-disable-line
+    (async () => {
+      const list = await getSessions(user.uid);
+      setSessions(list);
+
+      const storedId = sessionStorage.getItem('cs_activeSessionId');
+      if (storedId && list.some(s => s.id === storedId)) {
+        const data = await getSession(user.uid, storedId);
+        if (data && data.messages) {
+          historyRef.current = data.messages;
+          const msgs = data.messages
+            .filter(m => !m.parts?.[0]?.text?.startsWith('[User selected quiz category:'))
+            .map((m, i) => ({
+            role: m.role === 'user' ? 'user' : 'bot',
+            text: m.parts?.[0]?.text || '',
+            id: Date.now() + i,
+            isAgent: m.role === 'agent',
+          }));
+          setMessages(msgs);
+          setActiveSessionId(storedId);
+          return;
+        }
+      }
+
+      const newId = generateSessionId();
+      sessionStorage.setItem('cs_activeSessionId', newId);
+      setActiveSessionId(newId);
+      const greeting = productContext
+        ? `Hi! 👋 I see you're looking at **${productContext.productName}**. What would you like to know about it?`
+        : "Hi there! 👋 I'm CareSphere, your personal shopping assistant. How can I help you today?";
+      historyRef.current = [{ role: 'model', parts: [{ text: greeting }] }];
+      setMessages([{ role: 'bot', text: greeting, id: Date.now() }]);
+    })();
+  }, [user?.uid, productContext]);
 
   // -------------------------------------------------------------------------
   // Realtime Escalation Support Sync (Two-Way Chat)
@@ -60,6 +105,36 @@ export default function ChatWidget({ initialProductContext = null }) {
   useEffect(() => {
     const escalationsRef = ref(db, 'escalations');
     const unsubscribe = onValue(escalationsRef, (snapshot) => {
+      const resolvedMsg = { role: 'bot', text: 'The support specialist has resolved this ticket. CareSphere AI is back to help you! 😊', id: Date.now() };
+
+      function handleResolvedTransition() {
+        prevEscalatedRef.current = false;
+        setEscalated(false);
+        setActiveEscalationId(null);
+        setMessages((prev) => [...prev, resolvedMsg]);
+        const savedHistory = lastChatHistoryRef.current;
+        lastChatHistoryRef.current = null;
+        if (Array.isArray(savedHistory)) {
+          historyRef.current = savedHistory.map(m => ({
+            role: m.sender === 'customer' ? 'user' : (m.sender === 'agent' ? 'agent' : 'model'),
+            parts: [{ text: m.message || '' }]
+          }));
+        } else {
+          historyRef.current = [];
+        }
+        historyRef.current.push({ role: 'model', parts: [{ text: resolvedMsg.text }] });
+        userMsgCountRef.current = 0;
+        failureCountRef.current = 0;
+        autoEscalatedRef.current = false;
+        escalationCooldownRef.current = true;
+        const sessionId = sessionStorage.getItem('cs_activeSessionId');
+        if (user?.uid && sessionId) {
+          saveSession(user.uid, sessionId, historyRef.current).then(() => {
+            getSessions(user.uid).then(setSessions);
+          });
+        }
+      }
+
       if (snapshot.exists()) {
         let activeEsc = null;
         snapshot.forEach((childSnap) => {
@@ -74,7 +149,6 @@ export default function ChatWidget({ initialProductContext = null }) {
           setActiveEscalationId(activeEsc.id);
           prevEscalatedRef.current = true;
 
-          // Sync messages from escalation chatHistory!
           if (activeEsc.chatHistory) {
             const history = Array.isArray(activeEsc.chatHistory)
               ? activeEsc.chatHistory
@@ -87,7 +161,6 @@ export default function ChatWidget({ initialProductContext = null }) {
                 let isAgent = false;
                 let text = '';
 
-                // Raw Gemini history format fallback: { role, parts: [{ text }] }
                 if (m.role && m.parts) {
                   role = m.role === 'user' ? 'user' : 'bot';
                   if (Array.isArray(m.parts)) {
@@ -95,78 +168,47 @@ export default function ChatWidget({ initialProductContext = null }) {
                   } else {
                     text = m.parts || '';
                   }
-                  
-                  // Clean tags from bot replies in the client chat feed
                   if (role === 'bot') {
                     text = text.replace(/<response>([\s\S]*?)<\/response>/i, '$1')
                                .replace(/\[FLASH_DEAL\]/g, '')
                                .replace(/\[ESCALATE\]/g, '')
                                .replace(/\[REDIRECT:\s*[^\]]+\]/gi, '')
+                               .replace(/\[CART_REMOVE:\s*[^\]]+\]/gi, '')
                                .trim();
                   }
-                } 
-                // Standardized escalations history format: { sender, message }
-                else {
+                } else {
                   if (m.sender === 'customer') role = 'user';
-                  else if (m.sender === 'agent') {
-                    role = 'bot'; // Map to bot role for layout, but flag as agent
-                    isAgent = true;
-                  }
+                  else if (m.sender === 'agent') isAgent = true;
                   text = m.message || '';
                 }
 
-                return {
-                  role,
-                  text,
-                  id: m.timestamp || idx,
-                  isAgent
-                };
+                return { role, text, id: m.timestamp || idx, isAgent };
               });
             setMessages(mappedMessages);
+            lastChatHistoryRef.current = activeEsc.chatHistory;
           }
+        } else if (prevEscalatedRef.current) {
+          handleResolvedTransition();
         } else {
-          // If was previously escalated and is now resolved, show reset message
-          if (prevEscalatedRef.current) {
-            prevEscalatedRef.current = false;
-            setEscalated(false);
-            setActiveEscalationId(null);
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: 'bot',
-                text: 'The support specialist has resolved this ticket. CareSphere AI is back to help you! 😊',
-                id: Date.now()
-              }
-            ]);
-            // Clear raw gemini history so it starts fresh after human handoff
-            historyRef.current = [];
-          } else {
-            setEscalated(false);
-            setActiveEscalationId(null);
-          }
+          setEscalated(false);
+          setActiveEscalationId(null);
         }
+      } else if (prevEscalatedRef.current) {
+        handleResolvedTransition();
       } else {
-        if (prevEscalatedRef.current) {
-          prevEscalatedRef.current = false;
-          setEscalated(false);
-          setActiveEscalationId(null);
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: 'bot',
-              text: 'The support specialist has resolved this ticket. CareSphere AI is back to help you! 😊',
-              id: Date.now()
-            }
-          ]);
-          historyRef.current = [];
-        } else {
-          setEscalated(false);
-          setActiveEscalationId(null);
-        }
+        setEscalated(false);
+        setActiveEscalationId(null);
       }
     });
     return () => unsubscribe();
   }, [user]);
+
+  // Cleanup save session debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveSessionTimerRef.current) clearTimeout(saveSessionTimerRef.current);
+    };
+  }, []);
 
   // -------------------------------------------------------------------------
   // Proactive Delay Notifications (Realtime Database)
@@ -204,10 +246,10 @@ export default function ChatWidget({ initialProductContext = null }) {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [user?.uid]);
 
   // -------------------------------------------------------------------------
-  // Feature 4 — Out of Stock Notifications (Realtime Database)
+  // Out of Stock Notifications (Realtime Database)
   // -------------------------------------------------------------------------
   useEffect(() => {
     const productsRef = ref(db, 'products');
@@ -238,7 +280,7 @@ export default function ChatWidget({ initialProductContext = null }) {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [user?.uid]);
 
   // -------------------------------------------------------------------------
   // Auto-scroll
@@ -256,6 +298,14 @@ export default function ChatWidget({ initialProductContext = null }) {
       setHasUnread(false);
     }
   }, [isOpen]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      timeoutsRef.current.forEach(clearTimeout);
+      timeoutsRef.current = [];
+    };
+  }, []);
 
   // -------------------------------------------------------------------------
   // Expose global API for P2's "Ask CareSphere" buttons
@@ -300,7 +350,12 @@ export default function ChatWidget({ initialProductContext = null }) {
 
     try {
       const customerId = user?.uid || null;
-      const result = await handleMessage(text, historyRef.current, {
+      // Sanitize history: convert 'agent' role to 'model' for Gemini API
+      const sanitizedHistory = historyRef.current.map(m => ({
+        ...m,
+        role: m.role === 'agent' ? 'model' : m.role,
+      }));
+      const result = await handleMessage(text, sanitizedHistory, {
         mode,
         customerId,
         productContext,
@@ -313,31 +368,45 @@ export default function ChatWidget({ initialProductContext = null }) {
         { role: 'model', parts: [{ text: result.reply }] },
       ];
 
-      setIsTyping(false);
-
-      // Add bot reply
-      let replyText = result.reply;
-
-      // Parse CART_REMOVE tags
-      const cartRemoveMatch = replyText.match(/\[CART_REMOVE:\s*([^\]]+)\]/);
-      if (cartRemoveMatch && user?.uid) {
-        const ids = cartRemoveMatch[1].split(',').map((s) => s.trim()).filter(Boolean);
-        for (const prodId of ids) {
-          await removeFromCart(user.uid, prodId);
-        }
-        replyText = replyText.replace(/\[CART_REMOVE:\s*[^\]]+\]\s*/g, '');
+      // Persist chat session (debounced)
+      if (user?.uid && activeSessionId) {
+        if (saveSessionTimerRef.current) clearTimeout(saveSessionTimerRef.current);
+        saveSessionTimerRef.current = setTimeout(async () => {
+          await saveSession(user.uid, activeSessionId, historyRef.current);
+          const updated = await getSessions(user.uid);
+          setSessions(updated);
+          saveSessionTimerRef.current = null;
+        }, 1500);
       }
 
-      const botMsg = { role: 'bot', text: replyText, id: Date.now() + 1 };
+      setIsTyping(false);
+
+      // Execute cart removals from [CART_REMOVE] tag (detected from raw reply)
+      if (result.cartRemoveIds && user?.uid) {
+        for (const prodId of result.cartRemoveIds) {
+          await removeFromCart(user.uid, prodId);
+        }
+      }
+
+      // Execute cart quantity updates from [CART_UPDATE] tag
+      if (result.cartUpdate && user?.uid) {
+        await updateCartQuantity(user.uid, result.cartUpdate.productId, result.cartUpdate.quantity);
+      }
+
+      // Track [FAILURE] tag for auto-escalation
+      if (result.failureDetected) {
+        failureCountRef.current += 1;
+      }
+
+      const botMsg = { role: 'bot', text: result.reply, id: Date.now() + 1 };
       setMessages((prev) => [...prev, botMsg]);
 
       if (!isOpen) setHasUnread(true);
 
       // Handle Auto-Navigation / Website Control
       if (result.redirectPath) {
-        setTimeout(() => {
-          navigate(result.redirectPath);
-        }, 1000);
+        const t = setTimeout(() => navigate(result.redirectPath), 1000);
+        timeoutsRef.current.push(t);
       }
 
       // Handle Flash Deal
@@ -349,15 +418,40 @@ export default function ChatWidget({ initialProductContext = null }) {
         }
       }
 
-      // Handle Escalation — immediately transition to human-agent mode
+      // Track user message count for auto-escalation
+      userMsgCountRef.current += 1;
+
+      // Clear escalation cooldown after first post-resolution exchange
+      if (escalationCooldownRef.current) {
+        escalationCooldownRef.current = false;
+      }
+
+      // Handle Escalation — bot-triggered or auto-detected (failures or message count)
+      const botRequestedEsc = result.escalated && !escalationCooldownRef.current;
+      const autoEscalation = !escalated && !autoEscalatedRef.current && userMsgCountRef.current >= 4 && failureCountRef.current >= 3;
+      const shouldEscalate = botRequestedEsc || autoEscalation;
+      let escalateReason = '';
       if (result.escalated) {
+        escalateReason = 'Bot requested human handoff';
+      } else if (failureCountRef.current >= 3) {
+        escalateReason = `Bot failed to answer ${failureCountRef.current} queries — handing off to human agent`;
+        // Insert a bot message explaining the handoff before creating the escalation
+        setMessages((prev) => [
+          ...prev,
+          { role: 'bot', text: "I'm having trouble finding the information you need. Let me connect you with a human agent who can help.", id: Date.now() + 2 },
+        ]);
+      } else {
+        escalateReason = `Customer sent ${userMsgCountRef.current} messages without resolution`;
+      }
+
+      if (shouldEscalate) {
         setShowQuiz(false);
+        autoEscalatedRef.current = true;
+
         try {
           const chatHistory = normalizeHistoryToEscalation(historyRef.current);
-          const lastCustomerMsg = chatHistory.filter(m => m.sender === 'customer').pop();
-          const summary = lastCustomerMsg
-            ? `Customer: ${lastCustomerMsg.message.slice(0, 100)}`
-            : 'Customer requested human agent';
+          const summary = await generateSummary(historyRef.current);
+
           const escId = await createEscalation({
             customerId: user?.uid || 'anonymous',
             chatHistory,
@@ -383,7 +477,7 @@ export default function ChatWidget({ initialProductContext = null }) {
         },
       ]);
     }
-  }, [inputText, isTyping, escalated, activeEscalationId, mode, productContext, quizAnswered, isOpen, navigate]);
+  }, [inputText, isTyping, escalated, activeSessionId, activeEscalationId, mode, productContext, quizAnswered, isOpen, navigate]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -398,6 +492,64 @@ export default function ChatWidget({ initialProductContext = null }) {
   const switchMode = (newMode) => {
     if (newMode === mode) return;
     setMode(newMode);
+  };
+
+  // -------------------------------------------------------------------------
+  // Chat session management
+  // -------------------------------------------------------------------------
+  const handleNewSession = async () => {
+    if (!user?.uid || escalated || isTyping) return;
+    const newId = generateSessionId();
+    sessionStorage.setItem('cs_activeSessionId', newId);
+    setActiveSessionId(newId);
+    setShowSessions(false);
+    setQuizAnswered(false);
+    setShowQuiz(false);
+    userMsgCountRef.current = 0;
+    failureCountRef.current = 0;
+    autoEscalatedRef.current = false;
+    const greeting = "Hi there! 👋 I'm CareSphere, your personal shopping assistant. How can I help you today?";
+    historyRef.current = [{ role: 'model', parts: [{ text: greeting }] }];
+    setMessages([{ role: 'bot', text: greeting, id: Date.now() }]);
+    const updated = await getSessions(user.uid);
+    setSessions(updated);
+  };
+
+  const handleLoadSession = async (sessionId) => {
+    if (!user?.uid || !sessionId || isTyping) return;
+    const data = await getSession(user.uid, sessionId);
+    if (!data || !data.messages) return;
+    sessionStorage.setItem('cs_activeSessionId', sessionId);
+    setActiveSessionId(sessionId);
+    setShowSessions(false);
+    setQuizAnswered(false);
+    setShowQuiz(false);
+    historyRef.current = data.messages;
+    let msgs = data.messages
+      .filter(m => !m.parts?.[0]?.text?.startsWith('[User selected quiz category:'))
+      .map((m, i) => ({
+      role: m.role === 'user' ? 'user' : 'bot',
+      text: m.parts?.[0]?.text || '',
+      id: Date.now() + i,
+      isAgent: m.role === 'agent',
+    }));
+    // Prepend bot greeting if first stored message is from user (old sessions without greeting)
+    if (msgs.length > 0 && msgs[0].role === 'user') {
+      msgs = [{ role: 'bot', text: "Hi there! 👋 I'm CareSphere, your personal shopping assistant. How can I help you today?", id: Date.now() - 1, isAgent: false }, ...msgs];
+    }
+    setMessages(msgs);
+    userMsgCountRef.current = 0;
+    failureCountRef.current = 0;
+  };
+
+  const handleDeleteSession = async (sessionId) => {
+    if (!user?.uid || !sessionId) return;
+    await deleteSession(user.uid, sessionId);
+    const updated = await getSessions(user.uid);
+    setSessions(updated);
+    if (sessionId === activeSessionId) {
+      handleNewSession();
+    }
   };
 
   // -------------------------------------------------------------------------
@@ -421,7 +573,7 @@ export default function ChatWidget({ initialProductContext = null }) {
 
     const code = generateCode();
     try {
-      await createFlashDealCode(user?.uid || 'anonymous', code, 15);
+      await createFlashDealCode(user?.uid || 'anonymous', code, 15, category);
     } catch (err) {
       console.error('Failed to save flash deal code:', err);
     }
@@ -436,6 +588,10 @@ export default function ChatWidget({ initialProductContext = null }) {
       { role: 'user', parts: [{ text: `[User selected quiz category: ${category}]` }] },
       { role: 'model', parts: [{ text: dealMsg }] },
     ];
+
+    if (user?.uid && activeSessionId) {
+      saveSession(user.uid, activeSessionId, historyRef.current);
+    }
 
     setMessages((prev) => [
       ...prev,
@@ -524,12 +680,23 @@ export default function ChatWidget({ initialProductContext = null }) {
             <span className="cw-header__avatar">🤖</span>
             <div>
               <div className="cw-header__name">CareSphere</div>
-              <div className="cw-header__status">
-                {escalated ? '🟡 Human agent connected' : '🟢 Online'}
-              </div>
             </div>
           </div>
           <div className="cw-header__controls">
+            {user?.uid && !escalated && (
+              <button
+                className={`cw-mode-btn ${showSessions ? 'cw-mode-btn--active' : ''}`}
+                onClick={async () => {
+                  const list = await getSessions(user.uid);
+                  setSessions(list);
+                  setShowSessions(v => !v);
+                }}
+                title="Chat history"
+                id="chat-history-btn"
+              >
+                📋
+              </button>
+            )}
             <div className="cw-mode-toggle" role="group" aria-label="Reply style">
               <button
                 className={`cw-mode-btn ${mode === 'human' ? 'cw-mode-btn--active' : ''}`}
@@ -574,6 +741,43 @@ export default function ChatWidget({ initialProductContext = null }) {
               >
                 Return to AI
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Sessions panel overlay */}
+        {showSessions && (
+          <div className="cw-sessions">
+            <div className="cw-sessions__header">
+              <span>Chat History</span>
+              <button className="cw-sessions__new-btn" onClick={handleNewSession} id="chat-new-session-btn">
+                + New Chat
+              </button>
+            </div>
+            <div className="cw-sessions__list">
+              {sessions.length === 0 && (
+                <div className="cw-sessions__empty">No previous chats</div>
+              )}
+              {sessions.map(s => (
+                <div key={s.id} className={`cw-sessions__item ${s.id === activeSessionId ? 'cw-sessions__item--active' : ''}`}>
+                  <button
+                    className="cw-sessions__item-btn"
+                    onClick={() => handleLoadSession(s.id)}
+                    title={s.preview}
+                  >
+                    <span className="cw-sessions__item-preview">{s.preview || 'Empty chat'}</span>
+                    <span className="cw-sessions__item-time">{s.updatedAt ? new Date(s.updatedAt).toLocaleDateString() : ''}</span>
+                  </button>
+                  <button
+                    className="cw-sessions__del-btn"
+                    onClick={() => handleDeleteSession(s.id)}
+                    title="Delete"
+                    id={`del-session-${s.id}`}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         )}

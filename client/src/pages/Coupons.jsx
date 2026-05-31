@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRealtimeListener } from '../hooks/useRealtimeListener';
 
@@ -15,13 +15,19 @@ const CATEGORY_ICONS = {
 function CouponCard({ coupon }) {
   const [copied, setCopied] = useState(false);
   const isExpired = new Date(coupon.expiryDate) < new Date();
+  const copyTimeoutRef = useRef(null);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(coupon.id).then(() => {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     });
   };
+
+  useEffect(() => {
+    return () => clearTimeout(copyTimeoutRef.current);
+  }, []);
 
   return (
     <div className={`coup-card ${isExpired ? 'expired' : ''}`}>
@@ -122,8 +128,6 @@ export default function Coupons() {
 }
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-
   .coup-page {
     min-height: 100vh;
     background: #F9FAFB;

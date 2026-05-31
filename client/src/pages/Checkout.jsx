@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/AuthContext';
 import { useRealtimeListener } from '../hooks/useRealtimeListener';
 import { clearCart, removeFromCart, updateCartQuantity } from '../firebase/cart';
 import { createOrder } from '../firebase/orders';
-import { updateProductStock } from '../firebase/products';
+import { decrementProductStock } from '../firebase/products';
 import { validateCoupon } from '../firebase/coupons';
 import { validateFlashDealCode, markFlashDealUsed } from '../firebase/flashDeals';
 import TopNav from '../components/TopNav';
@@ -34,6 +34,32 @@ export default function Checkout() {
     setRemoving(null);
   };
 
+
+
+  if (!user) {
+    return (
+      <>
+        <style>{styles}</style>
+        <TopNav />
+        <div className="co-page">
+          <div className="co-empty">
+            <span style={{ fontSize: '2rem' }}>🔒</span>
+            <h2>Sign in to checkout</h2>
+            <p>Please sign in to view your cart and place orders.</p>
+            <button className="co-btn-primary" onClick={() => navigate('/login')}>Sign In</button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // For buy now flow: find product and treat as single-item cart
+  const buyNowProduct = buyNowId ? products.find((p) => p.id === buyNowId) : null;
+  const buyNowQty = Math.max(1, parseInt(searchParams.get('qty')) || 1);
+  const items = buyNowProduct
+    ? [{ id: buyNowProduct.id, productId: buyNowProduct.id, name: buyNowProduct.name, price: buyNowProduct.price || 0, quantity: buyNowQty, image: buyNowProduct.image || '' }]
+    : (cartItems || []);
+
   const handleApplyCoupon = async () => {
     const code = couponCode.trim();
     if (!code) return;
@@ -62,6 +88,18 @@ export default function Checkout() {
       }
       const flashDeal = await validateFlashDealCode(code, user?.uid);
       if (flashDeal) {
+        if (flashDeal.category) {
+          const itemCategories = items.map((item) => {
+            const product = products.find((p) => p.id === (item.productId || item.id));
+            return product?.category;
+          });
+          const matches = itemCategories.some((cat) => cat === flashDeal.category);
+          if (!matches) {
+            setCouponError(`This flash deal code only applies to ${flashDeal.category} products.`);
+            setCouponApplying(false);
+            return;
+          }
+        }
         setAppliedFlashDeal(flashDeal);
         setCouponApplying(false);
         return;
@@ -73,39 +111,16 @@ export default function Checkout() {
     setCouponApplying(false);
   };
 
-  if (!user) {
-    return (
-      <>
-        <style>{styles}</style>
-        <TopNav />
-        <div className="co-page">
-          <div className="co-empty">
-            <span style={{ fontSize: '2rem' }}>🔒</span>
-            <h2>Sign in to checkout</h2>
-            <p>Please sign in to view your cart and place orders.</p>
-            <button className="co-btn-primary" onClick={() => navigate('/login')}>Sign In</button>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // For buy now flow: find product and treat as single-item cart
-  const buyNowProduct = buyNowId ? products.find((p) => p.id === buyNowId) : null;
-  const buyNowQty = Math.max(1, parseInt(searchParams.get('qty')) || 1);
-  const items = buyNowProduct
-    ? [{ id: buyNowProduct.id, productId: buyNowProduct.id, name: buyNowProduct.name, price: buyNowProduct.price || 0, quantity: buyNowQty, image: buyNowProduct.image || '' }]
-    : (cartItems || []);
-
   const activeDiscount = appliedCoupon || appliedFlashDeal;
   const subtotal = items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
   const discountPercent = activeDiscount?.discountPercent || 0;
+  const categoryFilter = activeDiscount?.applicableOn || activeDiscount?.category;
   let discountAmount = 0;
   let discountDetails = [];
-  if (activeDiscount?.applicableOn) {
+  if (categoryFilter) {
     items.forEach(item => {
       const product = products.find(p => p.id === (item.productId || item.id));
-      if (product?.category === activeDiscount.applicableOn) {
+      if (product?.category === categoryFilter) {
         const itemTotal = (item.price || 0) * (item.quantity || 1);
         const saved = Math.round(itemTotal * discountPercent / 100);
         discountAmount += saved;
@@ -125,9 +140,10 @@ export default function Checkout() {
         const itemTotal = (item.price || 0) * (item.quantity || 1);
         let itemDiscount = 0;
         if (activeDiscount) {
-          if (activeDiscount.applicableOn) {
+          const catFilter = activeDiscount.applicableOn || activeDiscount.category;
+          if (catFilter) {
             const product = products.find(p => p.id === (item.productId || item.id));
-            if (product?.category === activeDiscount.applicableOn) {
+            if (product?.category === catFilter) {
               itemDiscount = Math.round(itemTotal * discountPercent / 100);
             }
           } else {
@@ -141,11 +157,7 @@ export default function Checkout() {
           couponCode: activeDiscount?.code || '',
           couponDiscount: discountPercent,
         });
-        const product = products.find(p => p.id === (item.productId || item.id));
-        if (product) {
-          const newStock = Math.max(0, (product.stock || 0) - (item.quantity || 1));
-          await updateProductStock(item.productId || item.id, newStock);
-        }
+        await decrementProductStock(item.productId || item.id, item.quantity || 1);
       }
       if (appliedFlashDeal) {
         await markFlashDealUsed(appliedFlashDeal.id);
@@ -282,7 +294,7 @@ export default function Checkout() {
                   <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '0.25rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                       <span className="co-total-label" style={{ color: '#10B981' }}>
-                        Discount ({discountPercent}%){appliedCoupon?.applicableOn ? ` on ${appliedCoupon.applicableOn}` : ''}
+                        Discount ({discountPercent}%){categoryFilter ? ` on ${categoryFilter}` : ''}
                       </span>
                       <span className="co-total-label" style={{ fontWeight: 700, color: '#10B981' }}>-₹{discountAmount.toLocaleString()}</span>
                     </div>
@@ -317,8 +329,6 @@ export default function Checkout() {
 }
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-
   .co-page {
     min-height: 100vh;
     background: #F9FAFB;

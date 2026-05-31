@@ -1,6 +1,11 @@
-import React from 'react';
+
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useRealtimeListener } from '../hooks/useRealtimeListener';
+
+const CATEGORY_ICONS = {
+  smartphones: '📱', footwear: '👟', skincare: '✨',
+  headphones: '🎧', luggage: '🧳', electronics: '💻',
+};
 
 // Determine which value "wins" for each spec
 function getWinner(key, val1, val2) {
@@ -136,7 +141,7 @@ export default function Compare() {
 
           {overallWinner && (
             <div className="cmp-winner-banner">
-              🏆 Overall winner: <strong>{overallWinner.name}</strong> — better in {Math.max(wins.p1, wins.p2)} of {wins.p1 + wins.p2 + (wins.p1 === wins.p2 ? 0 : 0)} compared attributes
+              🏆 Overall winner: <strong>{overallWinner.name}</strong> — better in {Math.max(wins.p1, wins.p2)} of {wins.p1 + wins.p2} compared attributes
             </div>
           )}
 
@@ -151,7 +156,7 @@ export default function Compare() {
                         {p1.image ? (
                           <img src={p1.image} alt={p1.name} className="cmp-prod-img" />
                         ) : (
-                          p1.category === 'smartphones' ? '📱' : p1.category === 'headphones' ? '🎧' : '📦'
+                          CATEGORY_ICONS[p1.category] || '📦'
                         )}
                       </div>
                       <div>
@@ -166,7 +171,7 @@ export default function Compare() {
                         {p2.image ? (
                           <img src={p2.image} alt={p2.name} className="cmp-prod-img" />
                         ) : (
-                          p2.category === 'smartphones' ? '📱' : p2.category === 'headphones' ? '🎧' : '📦'
+                          CATEGORY_ICONS[p2.category] || '📦'
                         )}
                       </div>
                       <div>
@@ -218,8 +223,6 @@ export default function Compare() {
 }
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-
   .cmp-page {
     min-height: 100vh;
     background: #F9FAFB;

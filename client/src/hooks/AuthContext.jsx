@@ -7,24 +7,37 @@ import { loginUser, registerUser, logoutUser } from '../firebase/auth';
 
 const AuthContext = createContext(null);
 
+async function buildUser(fbUser) {
+  const adminRef = ref(db, `admins/${fbUser.uid}`);
+  const snap = await get(adminRef);
+  return {
+    uid: fbUser.uid,
+    email: fbUser.email,
+    displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'User',
+    isAdmin: snap.exists() && snap.val() === true,
+  };
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const adminRef = ref(db, `admins/${firebaseUser.uid}`);
-        const snap = await get(adminRef);
-        const isAdmin = snap.exists() && snap.val() === true;
-        setUser({
+      try {
+        if (firebaseUser) {
+          setUser(await buildUser(firebaseUser));
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error('Auth state change error:', err);
+        setUser(firebaseUser ? {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-          isAdmin,
-        });
-      } else {
-        setUser(null);
+          isAdmin: false,
+        } : null);
       }
       setLoading(false);
     });
@@ -33,16 +46,9 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const fbUser = await loginUser(email, password);
-    const adminRef = ref(db, `admins/${fbUser.uid}`);
-    const snap = await get(adminRef);
-    const isAdmin = snap.exists() && snap.val() === true;
-    setUser({
-      uid: fbUser.uid,
-      email: fbUser.email,
-      displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'User',
-      isAdmin,
-    });
-    return isAdmin;
+    const u = await buildUser(fbUser);
+    setUser(u);
+    return u.isAdmin;
   };
 
   const register = async (email, password) => {

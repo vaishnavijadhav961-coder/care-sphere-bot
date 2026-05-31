@@ -1,23 +1,14 @@
 import { db } from './config';
 import { ref, get, child, update, set } from 'firebase/database';
+import { snapshotToArray } from './utils';
 
 const PATH_NAME = 'orders';
 
-/**
- * Fetch all orders from Realtime Database.
- * @returns {Promise<Array>} List of orders
- */
 export const getOrders = async () => {
   try {
     const dbRef = ref(db);
     const snapshot = await get(child(dbRef, PATH_NAME));
-    if (snapshot.exists()) {
-      const orders = [];
-      snapshot.forEach((childSnapshot) => {
-        orders.push({ id: childSnapshot.key, ...childSnapshot.val() });
-      });
-      return orders;
-    }
+    if (snapshot.exists()) return snapshotToArray(snapshot);
     return [];
   } catch (error) {
     console.error('Error fetching orders:', error);

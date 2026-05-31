@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRealtimeListener } from '../hooks/useRealtimeListener';
-import { updateProductStock, addToNotifyList } from '../firebase/products';
+import { addToNotifyList } from '../firebase/products';
 import { addToCart } from '../firebase/cart';
 import { useAuth } from '../hooks/AuthContext';
 import TopNav from '../components/TopNav';
@@ -30,7 +30,8 @@ const CATEGORY_ICONS = {
 
 function ProductCard({ product, onAskCareSphere, user }) {
   const navigate = useNavigate();
-  const [notified, setNotified] = useState(false);
+  const alreadyNotified = product.notifyList?.includes(user?.uid);
+  const [notified, setNotified] = useState(alreadyNotified);
   const [notifying, setNotifying] = useState(false);
   const [adding, setAdding] = useState(false);
 
@@ -38,7 +39,11 @@ function ProductCard({ product, onAskCareSphere, user }) {
     e.stopPropagation();
     if (!user) { navigate('/login'); return; }
     setAdding(true);
-    await addToCart(user.uid, product);
+    try {
+      await addToCart(user.uid, product);
+    } catch (err) {
+      alert(err.message);
+    }
     setAdding(false);
   };
   const discountedPrice = product.discount
@@ -47,8 +52,9 @@ function ProductCard({ product, onAskCareSphere, user }) {
 
   const handleNotify = async (e) => {
     e.stopPropagation();
+    if (!user) { navigate('/login'); return; }
     setNotifying(true);
-    const ok = await addToNotifyList(product.id, 'user123');
+    const ok = await addToNotifyList(product.id, user.uid);
     setNotifying(false);
     if (ok) setNotified(true);
   };
@@ -155,8 +161,6 @@ export default function ProductGrid() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-
         .p2-page {
           min-height: 100vh;
           background: #F9FAFB;

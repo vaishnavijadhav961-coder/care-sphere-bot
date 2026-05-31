@@ -1,20 +1,33 @@
 import { db } from './config';
-import { ref, set, remove, get } from 'firebase/database';
+import { ref, set, remove, get, runTransaction } from 'firebase/database';
+import { snapshotToArray } from './utils';
 
 const CART_PATH = 'carts';
 
 export const addToCart = async (uid, product, quantity = 1) => {
+  const productRef = ref(db, `products/${product.id}`);
+  const productSnap = await get(productRef);
+  if (!productSnap.exists()) throw new Error('Product not found');
+  const prodData = productSnap.val();
+  const availableStock = prodData.stock || 0;
+  if (availableStock < 1) throw new Error('This product is currently out of stock');
+
   const itemRef = ref(db, `${CART_PATH}/${uid}/${product.id}`);
-  const snap = await get(itemRef);
-  const existing = snap.val();
-  const qty = existing ? (existing.quantity || 0) + quantity : quantity;
-  await set(itemRef, {
-    productId: product.id,
-    name: product.name,
-    price: product.price || 0,
-    image: product.image || '',
-    quantity: qty,
-    addedAt: Date.now(),
+  await runTransaction(itemRef, (current) => {
+    const existing = current || {};
+    const currentQty = existing.quantity || 0;
+    const newQty = currentQty + quantity;
+    if (newQty > availableStock) {
+      return undefined;
+    }
+    return {
+      productId: product.id,
+      name: product.name,
+      price: product.price || 0,
+      image: product.image || '',
+      quantity: newQty,
+      addedAt: Date.now(),
+    };
   });
 };
 
@@ -48,9 +61,5 @@ export const getCart = async (uid) => {
   const cartRef = ref(db, `${CART_PATH}/${uid}`);
   const snap = await get(cartRef);
   if (!snap.exists()) return [];
-  const items = [];
-  snap.forEach((child) => {
-    items.push({ id: child.key, ...child.val() });
-  });
-  return items;
+  return snapshotToArray(snap);
 };

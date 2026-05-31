@@ -1,5 +1,5 @@
 import { db } from './config';
-import { ref, get, set, update, push, query, orderByChild, equalTo } from 'firebase/database';
+import { ref, get, set, update, push } from 'firebase/database';
 
 const PATH = 'flashDealCodes';
 
@@ -11,7 +11,7 @@ const PATH = 'flashDealCodes';
  * @param {number} discountPercent - e.g. 15
  * @returns {Promise<string>} The generated RTDB key
  */
-export const createFlashDealCode = async (customerId, code, discountPercent = 15) => {
+export const createFlashDealCode = async (customerId, code, discountPercent = 15, category = '') => {
   try {
     const codesRef = ref(db, PATH);
     const newRef = push(codesRef);
@@ -20,11 +20,12 @@ export const createFlashDealCode = async (customerId, code, discountPercent = 15
       code,
       customerId,
       discountPercent,
+      category,
       used: false,
       createdAt: new Date(now).toISOString(),
       expiresAt: new Date(now + 2 * 60 * 60 * 1000).toISOString(), // 2 hours
     });
-    console.log(`Flash deal code ${code} created for ${customerId}`);
+    console.log(`Flash deal code ${code} created for ${customerId} category:${category}`);
     return newRef.key;
   } catch (error) {
     console.error('Error creating flash deal code:', error);
@@ -40,22 +41,21 @@ export const createFlashDealCode = async (customerId, code, discountPercent = 15
 export const checkExistingFlashDeal = async (customerId) => {
   try {
     const codesRef = ref(db, PATH);
-    const q = query(codesRef, orderByChild('customerId'), equalTo(customerId));
-    const snapshot = await get(q);
+    const snapshot = await get(codesRef);
     if (!snapshot.exists()) return null;
 
     const now = new Date();
     let activeDeal = null;
     snapshot.forEach((child) => {
       const deal = { id: child.key, ...child.val() };
-      if (!deal.used && new Date(deal.expiresAt) > now) {
+      if (deal.customerId === customerId && !deal.used && new Date(deal.expiresAt) > now) {
         activeDeal = deal;
       }
     });
     return activeDeal;
   } catch (error) {
     console.error('Error checking existing flash deal:', error);
-    return null; // fail silently — don't block the chat
+    return null;
   }
 };
 
